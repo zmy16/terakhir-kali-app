@@ -85,20 +85,24 @@ npm run start:tunnel
 ## Struktur proyek
 
 ```text
-App.tsx                  Layar utama, bottom sheet, dan komponen UI
-index.ts                 Titik masuk aplikasi
-src/
-  activity.ts            Durasi, validasi, dan pengurutan
-  storage.ts             Simpan dan muat aktivitas (Expo SQLite key-value)
-  storage-codec.ts       Encode dan validasi payload tersimpan
-  profile.ts             Nama profil lokal
-  backup.ts              Format backup dan logika penggabungan
-  backup-file.ts         Export dan import lewat sistem file
-  interaction-copy.ts    Teks untuk aksi "Tandai hari ini"
-  *.test.ts              Unit test untuk modul di atas
-assets/                  Logo dan ikon aplikasi
-scripts/                 Pembuat ikon aplikasi
-eas.json                 Profil EAS Build
+terakhir-kali-app/
+├── App.tsx                   Layar utama, bottom sheet, dan komponen UI
+├── index.ts                  Titik masuk aplikasi
+├── src/
+│   ├── activity.ts           Durasi, validasi, dan pengurutan
+│   ├── storage.ts            Simpan dan muat aktivitas (Expo SQLite key-value)
+│   ├── storage-codec.ts      Encode dan validasi payload tersimpan
+│   ├── profile.ts            Nama profil lokal
+│   ├── backup.ts             Format backup dan logika penggabungan
+│   ├── backup-file.ts        Export dan import lewat sistem file
+│   ├── interaction-copy.ts   Teks untuk aksi "Tandai hari ini"
+│   └── *.test.ts             Unit test untuk modul di atas
+├── assets/                   Logo dan ikon aplikasi
+├── scripts/                  Pembuat ikon aplikasi
+├── app.json                  Konfigurasi Expo
+├── eas.json                  Profil EAS Build
+├── package.json              Dependensi dan script npm
+└── tsconfig.json             Konfigurasi TypeScript
 ```
 
 Logika bisnis ada di `src/` sebagai fungsi biasa tanpa ketergantungan pada React, sehingga bisa diuji di Node tanpa perangkat.
