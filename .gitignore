@@ -43,3 +43,7 @@ yarn-error.*
 # local tooling output and build artifacts
 .archify/
 *.apk
+
+# local AI tooling files
+AGENTS.md
+.claude/

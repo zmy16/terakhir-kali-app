@@ -34,7 +34,6 @@ Work:
 - Inspect generated scripts, SDK, navigation, test support.
 - Select installed/native persistence path. Prefer Expo-supported local storage already included or official Expo module when necessary.
 - Define validated persisted payload and migration version.
-- Update `AGENTS.md` with verified commands.
 
 Validation:
 
@@ -167,4 +166,3 @@ Current repo docs only:
 - `overview.md`
 - `SPEC.md`
 - `PLAN.md`
-- `AGENTS.md`

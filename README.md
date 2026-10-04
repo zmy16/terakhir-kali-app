@@ -1,125 +1,125 @@
 <div align="center">
-  <img src="assets/logo-mark.svg" alt="Terakhir Kali logo" width="96" height="96">
+  <img src="assets/logo-mark.svg" alt="Logo Terakhir Kali" width="96" height="96">
 
 # Terakhir Kali
 
-Track the things that matter to you and see how long it has been since you last did them.
+Catat hal-hal yang penting bagimu, lalu lihat sudah berapa lama sejak terakhir kali kamu melakukannya.
 
 </div>
 
-## About
+## Tentang
 
-**Terakhir Kali** ("the last time" in Indonesian) is a mobile app that shows how long it has been since you last called your mother, met an old friend, or visited the dentist. The list is sorted so the thing you have gone longest without doing is always on top.
+**Terakhir Kali** adalah aplikasi HP yang menunjukkan sudah berapa lama sejak kamu terakhir menelepon Ibu, bertemu sahabat lama, atau memeriksakan gigi. Daftar diurutkan agar hal yang paling lama terlewat selalu ada di atas.
 
-The app is deliberately calm. It states a fact and leaves the decision to you.
+Aplikasi ini sengaja dibuat tenang. Ia hanya menyampaikan fakta, keputusannya tetap di tanganmu.
 
-- No streaks, goals, scores, or guilt mechanics
-- No reminders or push notifications
-- No accounts, cloud sync, ads, or analytics
-- All data stays on the device
+- Tanpa streak, target, skor, atau rasa bersalah
+- Tanpa pengingat dan notifikasi
+- Tanpa akun, sinkronisasi cloud, iklan, atau analitik
+- Semua data tersimpan di perangkat
+
+## Unduh
+
+Ambil APK terbaru dari [halaman Releases](https://github.com/zmy16/terakhir-kali-app/releases/latest), lalu pasang di HP Android. Jika diminta, izinkan pemasangan dari browser atau pengelola file lewat **Install unknown apps**. Setiap rilis mencantumkan checksum SHA-256 untuk memverifikasi file.
+
+## Fitur
+
+- **Yang paling lama di atas.** Urutan berdasarkan `lastDoneAt` terlama, lalu `updatedAt` terlama, lalu `id`.
+- **Durasi berbasis kalender.** Tanggal dibandingkan sebagai tanggal kalender lokal, bukan selisih 24 jam. Hari ini tampil `Baru saja`, selebihnya tahun penuh, lalu bulan penuh, lalu hari.
+- **Tambah, ubah, hapus.** Judul maksimal 80 karakter dan tanggal masa depan ditolak. Tanggal dipilih lewat pemilih tanggal bawaan sistem.
+- **Tandai hari ini.** Meminta konfirmasi, lalu menyediakan satu kali undo.
+- **Profil lokal.** Hanya berisi nama tampilan, dipakai untuk sapaan sesuai jam. Ini bukan akun login.
+- **Tema gelap dan terang** dari sheet pengaturan.
+- **Backup JSON.** Export lewat share sheet sistem. Import menggabungkan data dan tidak pernah menghapus data yang ada.
+- **Kondisi loading, kosong, dan error penyimpanan**, lengkap dengan tombol coba lagi jika data tersimpan gagal dibaca.
 
 > [!NOTE]
-> The UI copy and `document/overview.md` are in Indonesian. The code and this README are in English.
-
-## Download
-
-Get the latest APK from the [Releases page](https://github.com/zmy16/terakhir-kali-app/releases/latest) and install it on an Android device. You may need to allow installs from your browser or file manager under **Install unknown apps**. Each release lists a SHA-256 checksum so you can verify the file.
-
-## Features
-
-- **Longest-overdue first.** Activities are sorted by oldest `lastDoneAt`, then oldest `updatedAt`, then `id`.
-- **Calendar-aware durations.** Dates are compared as local calendar dates, not 24-hour spans. Today reads `Baru saja`, otherwise complete years, then complete months, then days.
-- **Create, edit, delete.** Titles are limited to 80 characters and future dates are rejected. Dates come from the native date picker.
-- **Mark as done today.** Asks for confirmation, then offers a single undo.
-- **Local profile.** A display name only, used for a time-of-day greeting. It is not a login.
-- **Dark and light themes**, toggled from the settings sheet.
-- **JSON backup.** Export through the system share sheet. Import merges records and never clears existing data.
-- **Loading, empty, and storage-error states** for the list, plus a retry path if stored data cannot be read.
+> Teks antarmuka aplikasi berbahasa Indonesia.
 
 ## Tech stack
 
-| Area | Choice |
+| Bagian | Pilihan |
 | --- | --- |
 | Framework | [Expo](https://expo.dev) SDK 57, React Native 0.86, React 19.2 |
-| Language | TypeScript 6 (`strict`) |
-| Storage | `expo-sqlite` key-value store, with a versioned and validated JSON payload |
+| Bahasa | TypeScript 6 (`strict`) |
+| Penyimpanan | `expo-sqlite` key-value store, dengan payload JSON yang berversi dan divalidasi |
 | Backup | `expo-file-system`, `expo-sharing`, `expo-document-picker` |
-| Date input | `@react-native-community/datetimepicker` |
-| Graphics | `react-native-svg` for the logo and inline icons |
-| Layout | `react-native-safe-area-context` |
-| Unit tests | Node's built-in test runner (`node:test`) run through `tsx` |
-| Builds | [EAS Build](https://docs.expo.dev/build/introduction/) |
+| Input tanggal | `@react-native-community/datetimepicker` |
+| Grafik | `react-native-svg` untuk logo dan ikon |
+| Tata letak | `react-native-safe-area-context` |
+| Unit test | Test runner bawaan Node (`node:test`) lewat `tsx` |
+| Build | [EAS Build](https://docs.expo.dev/build/introduction/) |
 
-There is no navigation library, state manager, or UI kit. The app is a single screen with bottom sheets, so none were added.
+Tidak ada library navigasi, state manager, atau UI kit. Aplikasi ini satu layar dengan bottom sheet, jadi semuanya tidak dibutuhkan.
 
-## Getting started
+## Memulai
 
-Prerequisites: Node.js and npm (developed on Node 24), plus [Expo Go](https://expo.dev/go) on an Android device or an Android emulator.
+Prasyarat: Node.js dan npm (dikembangkan dengan Node 24), serta [Expo Go](https://expo.dev/go) di HP Android atau emulator Android.
 
 ```bash
 npm install
 npm start
 ```
 
-Scan the QR code with Expo Go. If your phone and computer are on different networks, use a tunnel:
+Scan kode QR dengan Expo Go. Jika HP dan komputer tidak berada di jaringan yang sama, pakai tunnel:
 
 ```bash
 npm run start:tunnel
 ```
 
 > [!TIP]
-> If Expo Go shows `Cannot connect to Expo CLI`, a stale tunnel is usually still running. Stop whatever is using port `8081`, start again, and scan the new QR code.
+> Jika Expo Go menampilkan `Cannot connect to Expo CLI`, biasanya tunnel lama masih berjalan. Hentikan proses yang memakai port `8081`, jalankan ulang, lalu scan QR yang baru.
 
-### Scripts
+### Perintah
 
-| Command | Description |
+| Perintah | Fungsi |
 | --- | --- |
-| `npm start` | Start the dev server |
-| `npm run android` | Start and open on Android |
-| `npm run ios` | Start and open on iOS |
-| `npm run start:tunnel` | Dev server through a tunnel |
-| `npm run start:lan` | Dev server over the local network |
-| `npm test` | Run unit tests |
-| `npm run typecheck` | Type-check with `tsc --noEmit` |
+| `npm start` | Jalankan dev server |
+| `npm run android` | Jalankan dan buka di Android |
+| `npm run ios` | Jalankan dan buka di iOS |
+| `npm run start:tunnel` | Dev server lewat tunnel |
+| `npm run start:lan` | Dev server lewat jaringan lokal |
+| `npm test` | Jalankan unit test |
+| `npm run typecheck` | Cek tipe dengan `tsc --noEmit` |
 
-## Project structure
+## Struktur proyek
 
 ```text
-App.tsx                  Main screen, bottom sheets, and UI components
-index.ts                 App entry point
+App.tsx                  Layar utama, bottom sheet, dan komponen UI
+index.ts                 Titik masuk aplikasi
 src/
-  activity.ts            Durations, validation, and sorting
-  storage.ts             Load and save activities (Expo SQLite key-value)
-  storage-codec.ts       Encode and validate the stored payload
-  profile.ts             Local profile name
-  backup.ts              Backup format and merge logic
-  backup-file.ts         Export and import through the file system
-  interaction-copy.ts    Copy for the "mark as done today" action
-  *.test.ts              Unit tests for the modules above
-assets/                  Logo and app icons
-design/                  Visual references and their adaptation notes
-document/                Product overview, spec, and delivery plan
-scripts/                 App icon generator
-eas.json                 EAS Build profiles
+  activity.ts            Durasi, validasi, dan pengurutan
+  storage.ts             Simpan dan muat aktivitas (Expo SQLite key-value)
+  storage-codec.ts       Encode dan validasi payload tersimpan
+  profile.ts             Nama profil lokal
+  backup.ts              Format backup dan logika penggabungan
+  backup-file.ts         Export dan import lewat sistem file
+  interaction-copy.ts    Teks untuk aksi "Tandai hari ini"
+  *.test.ts              Unit test untuk modul di atas
+assets/                  Logo dan ikon aplikasi
+design/                  Acuan visual dan catatan adaptasinya
+document/                Ringkasan produk, spesifikasi, dan rencana
+scripts/                 Pembuat ikon aplikasi
+eas.json                 Profil EAS Build
 ```
 
-Business logic lives in `src/` as plain functions with no React dependency, which keeps it testable under Node without a device.
+Logika bisnis ada di `src/` sebagai fungsi biasa tanpa ketergantungan pada React, sehingga bisa diuji di Node tanpa perangkat.
 
-## Data model
+## Model data
 
 ```ts
 type Activity = {
   id: string;
   title: string;
-  lastDoneAt: string; // local calendar date, YYYY-MM-DD
-  createdAt: string;  // ISO timestamp
-  updatedAt: string;  // ISO timestamp
+  lastDoneAt: string; // tanggal kalender lokal, YYYY-MM-DD
+  createdAt: string;  // timestamp ISO
+  updatedAt: string;  // timestamp ISO
 };
 ```
 
-Activities are stored under a single key with a version field. Stored data is validated when read. If the payload is corrupt, the app shows a storage error with a retry button.
+Aktivitas disimpan di satu key dengan field versi. Data tersimpan divalidasi saat dibaca. Jika payload rusak, aplikasi menampilkan error penyimpanan dengan tombol coba lagi.
 
-### Backup format
+### Format backup
 
 ```json
 {
@@ -130,45 +130,44 @@ Activities are stored under a single key with a version field. Stored data is va
 }
 ```
 
-On import, records are merged by `id`. When the same `id` exists on both sides, the record with the newer `updatedAt` wins.
+Saat import, data digabung berdasarkan `id`. Jika `id` yang sama ada di kedua sisi, data dengan `updatedAt` lebih baru yang dipakai.
 
 > [!IMPORTANT]
-> Data lives only on the device. Uninstalling the app or switching phones deletes it. Export a backup first.
+> Data hanya ada di perangkat. Menghapus aplikasi atau berpindah HP akan menghapusnya. Lakukan export backup lebih dulu.
 
-## Building an APK
+## Membuat APK
 
-APKs are built with EAS Build. The `preview` profile in `eas.json` produces an installable APK and increments `versionCode` automatically.
+APK dibuat dengan EAS Build. Profil `preview` di `eas.json` menghasilkan APK yang bisa langsung dipasang dan menaikkan `versionCode` secara otomatis.
 
 ```bash
 npx eas-cli@latest login
 npx eas-cli@latest build --platform android --profile preview
 ```
 
-The build runs on Expo's servers and ends with a download link. The Android package name is `com.raidm.terakhirkali`.
+Build berjalan di server Expo dan berakhir dengan tautan unduhan. Package name Android adalah `com.raidm.terakhirkali`.
 
 > [!NOTE]
-> `owner` and `extra.eas.projectId` in `app.json` point to the original author's Expo account. To build under your own account, run `npx eas-cli@latest init` and update those values.
+> `owner` dan `extra.eas.projectId` di `app.json` menunjuk ke akun Expo penulis asli. Untuk membuild dengan akunmu sendiri, jalankan `npx eas-cli@latest init` lalu perbarui nilai tersebut.
 
-## Testing
+## Pengujian
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-The unit tests cover duration formatting, input validation, sort order, the backup format and merge rules, the storage codec, and the action copy. UI tests are run separately with Katalon Studio against the installed APK and are not part of this repository.
+Unit test mencakup format durasi, validasi input, urutan aktivitas, format dan penggabungan backup, codec penyimpanan, serta teks aksi. Pengujian UI dijalankan terpisah dengan Katalon Studio terhadap APK yang terpasang, dan tidak termasuk dalam repositori ini.
 
-## Platform status
+## Status platform
 
 | Platform | Status |
 | --- | --- |
-| Android | Built as an APK and tested on a physical device |
-| iOS | Configured in `app.json`, but not built or tested |
+| Android | Sudah dibuild sebagai APK dan diuji di perangkat fisik |
+| iOS | Sudah dikonfigurasi di `app.json`, tetapi belum dibuild atau diuji |
 
-## Documentation
+## Dokumentasi
 
-- [Product overview](document/overview.md)
-- [Specification](document/SPEC.md)
-- [Delivery plan](document/PLAN.md)
-- [Design adaptation](design/ADAPTATION.md)
-- [Notes for AI coding agents](AGENTS.md)
+- [Ringkasan produk](document/overview.md)
+- [Spesifikasi](document/SPEC.md)
+- [Rencana pengerjaan](document/PLAN.md)
+- [Adaptasi desain](design/ADAPTATION.md)
