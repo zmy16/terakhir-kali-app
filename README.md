@@ -97,8 +97,6 @@ src/
   interaction-copy.ts    Teks untuk aksi "Tandai hari ini"
   *.test.ts              Unit test untuk modul di atas
 assets/                  Logo dan ikon aplikasi
-design/                  Acuan visual dan catatan adaptasinya
-document/                Ringkasan produk, spesifikasi, dan rencana
 scripts/                 Pembuat ikon aplikasi
 eas.json                 Profil EAS Build
 ```
@@ -164,10 +162,3 @@ Unit test mencakup format durasi, validasi input, urutan aktivitas, format dan p
 | --- | --- |
 | Android | Sudah dibuild sebagai APK dan diuji di perangkat fisik |
 | iOS | Sudah dikonfigurasi di `app.json`, tetapi belum dibuild atau diuji |
-
-## Dokumentasi
-
-- [Ringkasan produk](document/overview.md)
-- [Spesifikasi](document/SPEC.md)
-- [Rencana pengerjaan](document/PLAN.md)
-- [Adaptasi desain](design/ADAPTATION.md)

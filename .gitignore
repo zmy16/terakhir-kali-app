@@ -47,3 +47,7 @@ yarn-error.*
 # local AI tooling files
 AGENTS.md
 .claude/
+
+# local-only notes and design references
+/document/
+/design/
