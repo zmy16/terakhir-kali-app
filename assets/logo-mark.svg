@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Terakhir Kali app mark</title>
+  <desc id="desc">Two nested, open circular paths suggesting time passing and a remembered moment.</desc>
+  <rect width="256" height="256" rx="64" fill="#31533E"/>
+  <path d="M190 77A82 82 0 1 0 204 139" fill="none" stroke="#F7F5F0" stroke-width="22" stroke-linecap="round"/>
+  <path d="M167 105A48 48 0 1 0 176 142" fill="none" stroke="#BFE0C7" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="189" cy="75" r="12" fill="#B84332"/>
+</svg>

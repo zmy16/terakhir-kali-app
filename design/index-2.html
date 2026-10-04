@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang='en' class='dark h-full bg-[#08090B] text-[#F4F4F6]'>
+<head>
+
+<!-- __CANVAS_HEAD_READY_SHIM__ -->
+<script>
+(function() {
+  // 1. Bulletproof DOMContentLoaded shim for iframe previews:
+  // If the document is already interactive or complete, invoke listeners immediately.
+  var origAdd = document.addEventListener;
+  document.addEventListener = function(type, listener, options) {
+    if (type === 'DOMContentLoaded' && (document.readyState === 'interactive' || document.readyState === 'complete')) {
+      setTimeout(function() {
+        try {
+          if (typeof listener === 'function') {
+            listener.call(document, new Event('DOMContentLoaded'));
+          } else if (listener && typeof listener.handleEvent === 'function') {
+            listener.handleEvent(new Event('DOMContentLoaded'));
+          }
+        } catch (err) {
+          console.error('DOMContentLoaded listener error:', err);
+        }
+      }, 0);
+      return;
+    }
+    return origAdd.call(document, type, listener, options);
+  };
+
+  // 2. Lucide Icons auto-observer: guarded against recursive DOM mutation loops
+  var isRunningLucide = false;
+  function runLucide() {
+    if (isRunningLucide) return;
+    if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+      var unrendered = document.querySelectorAll('i[data-lucide]');
+      if (unrendered.length === 0) return;
+      isRunningLucide = true;
+      try { window.lucide.createIcons(); } catch {}
+      finally {
+        setTimeout(function() { isRunningLucide = false; }, 60);
+      }
+    }
+  }
+  window.addEventListener('load', runLucide);
+  setTimeout(runLucide, 100);
+  setTimeout(runLucide, 400);
+  setTimeout(runLucide, 1000);
+
+  // Watch for any dynamic innerHTML changes (e.g. app.js rendering tables) with strict debounce & check
+  if (typeof MutationObserver !== 'undefined') {
+    var lucideTimer = null;
+    var obs = new MutationObserver(function() {
+      if (isRunningLucide) return;
+      if (document.querySelectorAll('i[data-lucide]').length === 0) return;
+      clearTimeout(lucideTimer);
+      lucideTimer = setTimeout(runLucide, 60);
+    });
+    if (document.documentElement) {
+      obs.observe(document.documentElement, { childList: true, subtree: true });
+    }
+  }
+})();
+</script>
+
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>VibeMove — Workouts & Mood Alignment</title>
+
+  <!-- Google Fonts: Fraunces & Inter -->
+  <link rel='preconnect' href='https://fonts.googleapis.com'>
+  <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>
+  <link href='https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700&display=swap' rel='stylesheet'>
+
+  <!-- Tailwind CSS CDN -->
+  <script src='https://cdn.tailwindcss.com'></script>
+
+  <!-- Lucide Icons -->
+  <script src='https://unpkg.com/lucide@latest/dist/umd/lucide.min.js'></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            vibebg: '#121316',
+            vibesurface: '#1E2026',
+            vibeaccent: '#2A4032',
+            vibecoral: '#FF6347',
+            vibeborder: '#2B2E37',
+            vibemuted: '#9094A0',
+          },
+          fontFamily: {
+            serif: ['Fraunces', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+
+<body class='min-h-full bg-[#08090B] font-sans antialiased flex flex-col justify-center items-center py-0 sm:py-8 select-none'>
+
+  <!-- Mobile Frame (Variation 2: Workouts-Centric Feed with Expanded Mood Alignment & Interactive Drawer) -->
+  <main class='relative w-full max-w-[412px] h-[892px] bg-[#121316] sm:rounded-[48px] sm:border-[8px] sm:border-[#23262E] shadow-2xl overflow-hidden flex flex-col'>
+
+    <!-- iOS Status Bar & Dynamic Island -->
+    <header class='pt-3 px-7 flex justify-between items-center z-20 text-xs font-semibold text-white tracking-tight shrink-0'>
+      <span class='text-[14px] font-medium'>9:41</span>
+      <div class='w-24 h-5 bg-black rounded-full mx-auto relative'>
+        <div class='absolute right-2 top-1.5 w-2 h-2 rounded-full bg-[#1A1C22]'></div>
+      </div>
+      <div class='flex items-center space-x-1.5'>
+        <i data-lucide='signal' stroke-width='2.5' class='w-3.5 h-3.5 text-white inline-block' style='width: 14px; height: 14px;'></i>
+        <i data-lucide='wifi' stroke-width='2.5' class='w-3.5 h-3.5 text-white inline-block' style='width: 14px; height: 14px;'></i>
+        <i data-lucide='battery' stroke-width='2.5' class='w-4 h-4 text-white inline-block' style='width: 16px; height: 16px;'></i>
+      </div>
+    </header>
+
+    <!-- Main Viewport Scrollable Area -->
+    <div id='scroll-content' class='flex-1 overflow-y-auto no-scrollbar px-4 pt-3 pb-28 space-y-5'>
+
+      <!-- App Sub-Bar / Screen Title with Mood Filter Switch -->
+      <section class='flex items-center justify-between pt-1' aria-label='Screen Header'>
+        <div>
+          <span class='text-[11px] font-medium text-[#FF6347] tracking-wider uppercase'>Current State</span>
+          <h1 class='text-[22px] font-bold text-[#F4F4F6] tracking-tight leading-tight'>Workouts</h1>
+        </div>
+
+        <!-- True iOS Interactive Toggle Switch for Mood Adaptive Mode -->
+        <div class='flex items-center space-x-2 bg-[#1E2026] border border-[#2B2E37] px-3 py-1.5 rounded-full'>
+          <span class='text-[11px] font-medium text-[#9094A0]' id='mood-mode-label'>Adaptive</span>
+          <button id='mood-toggle-switch' type='button' aria-label='Toggle mood adaptive filtering' class='relative w-10 h-5 bg-[#FF6347] rounded-full transition-colors duration-200 focus:outline-none'>
+            <span id='mood-toggle-thumb' class='absolute top-0.5 right-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200'></span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Editorial Banner Variant: Compact Forest Capsule with Mascot Badge -->
+      <section class='relative bg-[#2A4032] border border-[#3A5644] rounded-[24px] p-4 text-white overflow-hidden shadow-sm'>
+        <!-- Floating Intentional Overlap Mascot Circle -->
+        <div class='absolute -top-3 -right-3 w-16 h-16 rounded-full bg-[#35503F] border-2 border-[#121316] flex items-center justify-center shadow-lg'>
+          <svg viewBox='0 0 100 100' class='w-11 h-11' fill='none' xmlns='http://www.w3.org/2000/svg'>
+            <path d='M50 20L54 28L63 24L63 33L72 33L68 42L76 46L69 52L75 59L66 61L69 70L60 69L59 78L50 74L42 78L41 69L31 70L34 61L25 59L31 52L24 46L32 42L28 33L37 33L37 24L46 28L50 20Z' fill='#FFB800' />
+            <circle cx='44' cy='48' r='3' fill='#1C2B22' />
+            <circle cx='56' cy='48' r='3' fill='#1C2B22' />
+            <path d='M45 57C47 60 53 60 55 57' stroke='#1C2B22' stroke-width='2' stroke-linecap='round' />
+          </svg>
+        </div>
+
+        <div class='pr-12'>
+          <div class='flex items-center space-x-2 mb-1.5'>
+            <span class='px-2 py-0.5 rounded-full bg-[#1C2B22]/70 text-[10px] font-semibold text-[#8EE8B3] uppercase tracking-wider'>Energy Match</span>
+            <span class='text-[11px] text-[#C4D5CA]'>Calibrated at 16:30</span>
+          </div>
+          <h2 class='font-serif text-[18px] leading-snug font-normal text-white mb-1.5'>
+            Feeling <em class='italic'>steady</em> &amp; ready to <em class='italic'>stretch</em>?
+          </h2>
+          <p class='text-[12px] text-[#D2DDD6] font-sans leading-normal mb-3'>
+            Recommendations auto-tuned to 45m moderate exertion.
+          </p>
+        </div>
+
+        <div class='flex items-center space-x-2.5'>
+          <button id='quick-match-cta' type='button' class='h-9 px-4 rounded-full bg-white text-[#1C2B22] font-semibold text-xs flex items-center space-x-1.5 active:scale-95 transition-all hover:bg-[#F2F4F2]'>
+            <span>Retune Energy</span>
+            <i data-lucide='sliders' stroke-width='2.5' class='w-3.5 h-3.5 text-[#1C2B22]' style='width: 14px; height: 14px;'></i>
+          </button>
+          <button id='energy-info-btn' type='button' class='h-9 px-3 rounded-full bg-[#1F3025] text-[#D2DDD6] font-medium text-xs flex items-center space-x-1 border border-[#3A5644] active:scale-95 transition-all'>
+            <i data-lucide='sparkles' stroke-width='2.5' class='w-3.5 h-3.5 text-[#FFB800]' style='width: 14px; height: 14px;'></i>
+            <span>94% match</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Section: Fits your mood today (Vertical Staggered List Variation) -->
+      <section class='space-y-3' aria-label='Fits your mood today'>
+        <div class='flex items-center justify-between'>
+          <div class='flex items-center space-x-2'>
+            <h3 class='text-[15px] font-semibold text-[#F4F4F6]'>Fits your mood today</h3>
+            <span class='w-2 h-2 rounded-full bg-[#FF6347] animate-pulse'></span>
+          </div>
+          <button id='change-mood-trigger' type='button' class='text-xs font-medium text-[#9094A0] hover:text-[#F4F4F6] flex items-center space-x-0.5 active:scale-95 transition-all'>
+            <span>Change my mood</span>
+            <i data-lucide='chevron-right' stroke-width='2.5' class='w-3.5 h-3.5' style='width: 14px; height: 14px;'></i>
+          </button>
+        </div>
+
+        <!-- Featured Big Card: Strength & sweat yoga -->
+        <article class='relative bg-[#1E2026] border border-[#2B2E37] rounded-[22px] overflow-hidden group transition-all'>
+          <!-- Absolute Boundary Overlap Badge -->
+          <div class='absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-[#121316]/80 backdrop-blur-md border border-[#2B2E37] text-[10px] font-semibold text-[#FF6347] flex items-center space-x-1'>
+            <i data-lucide='flame' stroke-width='2.5' class='w-3 h-3 text-[#FF6347]' style='width: 12px; height: 12px;'></i>
+            <span>Top Recommendation</span>
+          </div>
+
+          <!-- Like Action Button -->
+          <button type='button' class='workout-like-btn absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-[#121316]/70 backdrop-blur-md border border-[#2B2E37] flex items-center justify-center text-[#F4F4F6] active:scale-90 transition-all'>
+            <i data-lucide='heart' stroke-width='2.5' class='w-4 h-4' style='width: 16px; height: 16px;'></i>
+          </button>
+
+          <!-- Imagery Container -->
+          <div class='relative h-44 w-full bg-[#272A32] overflow-hidden'>
+            <img src='https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=800&q=80' alt='Strength and sweat yoga instructor' class='w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500' />
+            <div class='absolute inset-0 bg-gradient-to-t from-[#1E2026] via-transparent to-transparent pointer-events-none'></div>
+          </div>
+
+          <!-- Card Details -->
+          <div class='p-4 pt-1'>
+            <div class='flex items-baseline justify-between mb-1'>
+              <h4 class='text-[16px] font-semibold text-[#F4F4F6]'>Strength &amp; sweat yoga</h4>
+              <span class='text-[11px] font-medium text-[#9094A0]'>45 min</span>
+            </div>
+
+            <div class='flex items-center space-x-4 text-[11.5px] text-[#9094A0] mb-3'>
+              <div class='flex items-center space-x-1'>
+                <i data-lucide='calendar' stroke-width='2.5' class='w-3.5 h-3.5 text-[#9094A0]' style='width: 14px; height: 14px;'></i>
+                <span>Today, 17:00–17:45</span>
+              </div>
+              <div class='flex items-center space-x-1'>
+                <i data-lucide='zap' stroke-width='2.5' class='w-3.5 h-3.5 text-[#FF6347]' style='width: 14px; height: 14px;'></i>
+                <span class='text-[#F4F4F6] font-medium'>High intensity</span>
+              </div>
+            </div>
+
+            <!-- Tags Row -->
+            <div class='flex items-center justify-between pt-1 border-t border-[#2B2E37]/60'>
+              <div class='flex items-center space-x-1.5'>
+                <span class='px-2.5 py-1 rounded-full bg-[#272A32] text-[10.5px] font-medium text-[#C8CBD3]'>Energizing</span>
+                <span class='px-2.5 py-1 rounded-full bg-[#272A32] text-[10.5px] font-medium text-[#C8CBD3]'>Power</span>
+                <span class='px-2.5 py-1 rounded-full bg-[#272A32] text-[10.5px] font-medium text-[#C8CBD3]'>Strength</span>
+              </div>
+
+              <!-- Inline Action Pill -->
+              <button type='button' class='start-workout-btn h-8 px-3 rounded-full bg-[#FF6347] text-white font-medium text-xs flex items-center space-x-1 active:scale-95 transition-all shadow-sm'>
+                <span>Start</span>
+                <i data-lucide='play' stroke-width='2.5' class='w-3 h-3 text-white' style='width: 12px; height: 12px;'></i>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Secondary Compact Card: Cycling Pulse -->
+        <article class='bg-[#1E2026] border border-[#2B2E37] rounded-[20px] p-3 flex items-center space-x-3.5 active:scale-[0.99] transition-all'>
+          <div class='relative w-20 h-20 rounded-[14px] overflow-hidden shrink-0 bg-[#272A32]'>
+            <img src='https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=400&q=80' alt='Cycling sprint training' class='w-full h-full object-cover' />
+            <div class='absolute inset-0 bg-black/20'></div>
+          </div>
+
+          <div class='flex-1 min-w-0'>
+            <div class='flex items-center justify-between'>
+              <span class='text-[10px] font-medium text-[#FFB800] uppercase tracking-wide'>Cardio Burn</span>
+              <span class='text-[11px] text-[#9094A0]'>Today, 18:30</span>
+            </div>
+            <h4 class='text-[14px] font-semibold text-[#F4F4F6] truncate mt-0.5'>Cycling intervals sprint</h4>
+            <div class='flex items-center space-x-2 text-[11px] text-[#9094A0] mt-1'>
+              <span class='px-2 py-0.5 rounded-full bg-[#272A32] text-[10px] text-[#C8CBD3]'>Sweat</span>
+              <span class='px-2 py-0.5 rounded-full bg-[#272A32] text-[10px] text-[#C8CBD3]'>Rhythm</span>
+            </div>
+          </div>
+
+          <button type='button' class='workout-like-btn w-8 h-8 rounded-full bg-[#272A32] border border-[#353945] flex items-center justify-center text-[#9094A0] hover:text-white shrink-0 active:scale-90 transition-all'>
+            <i data-lucide='heart' stroke-width='2.5' class='w-4 h-4' style='width: 16px; height: 16px;'></i>
+          </button>
+        </article>
+      </section>
+
+      <!-- Section: Browse Workouts / Categories Combined -->
+      <section class='space-y-3' aria-label='Browse workouts'>
+        <div class='flex items-center justify-between'>
+          <h3 class='text-[15px] font-semibold text-[#F4F4F6]'>Browse workouts</h3>
+          <span class='text-xs text-[#9094A0] font-normal'>42 sessions</span>
+        </div>
+
+        <!-- Filter Search Bar -->
+        <div class='relative flex items-center bg-[#1E2026] border border-[#2B2E37] rounded-full h-11 px-3.5 focus-within:border-[#FF6347] transition-all'>
+          <i data-lucide='search' stroke-width='2.5' class='w-4 h-4 text-[#9094A0] mr-2 shrink-0' style='width: 16px; height: 16px;'></i>
+          <input type='text' id='search-input-field' placeholder='Search name, intensity or coach' class='bg-transparent text-xs text-[#F4F4F6] placeholder-[#9094A0] w-full focus:outline-none' />
+          <button id='filter-options-btn' type='button' aria-label='Filters' class='w-7 h-7 rounded-full bg-[#272A32] flex items-center justify-center text-[#F4F4F6] hover:bg-[#353945] active:scale-90 transition-all'>
+            <i data-lucide='sliders-horizontal' stroke-width='2.5' class='w-3.5 h-3.5' style='width: 14px; height: 14px;'></i>
+          </button>
+        </div>
+
+        <!-- Horizontal Interactive Category Chips -->
+        <div class='flex space-x-2 overflow-x-auto no-scrollbar pt-1'>
+          <button type='button' class='category-chip shrink-0 px-3.5 py-2 rounded-full bg-[#FF6347] text-white text-xs font-medium flex items-center space-x-1.5 active:scale-95 transition-all' data-cat='All'>
+            <i data-lucide='layers' stroke-width='2.5' class='w-3.5 h-3.5 text-white' style='width: 14px; height: 14px;'></i>
+            <span>All Workouts</span>
+          </button>
+          <button type='button' class='category-chip shrink-0 px-3.5 py-2 rounded-full bg-[#1E2026] border border-[#2B2E37] text-[#C8CBD3] text-xs font-medium flex items-center space-x-1.5 hover:border-[#FF6347] active:scale-95 transition-all' data-cat='Gym'>
+            <i data-lucide='dumbbell' stroke-width='2.5' class='w-3.5 h-3.5 text-[#9094A0]' style='width: 14px; height: 14px;'></i>
+            <span>Gym</span>
+          </button>
+          <button type='button' class='category-chip shrink-0 px-3.5 py-2 rounded-full bg-[#1E2026] border border-[#2B2E37] text-[#C8CBD3] text-xs font-medium flex items-center space-x-1.5 hover:border-[#FF6347] active:scale-95 transition-all' data-cat='Yoga'>
+            <i data-lucide='sparkle' stroke-width='2.5' class='w-3.5 h-3.5 text-[#9094A0]' style='width: 14px; height: 14px;'></i>
+            <span>Yoga</span>
+          </button>
+          <button type='button' class='category-chip shrink-0 px-3.5 py-2 rounded-full bg-[#1E2026] border border-[#2B2E37] text-[#C8CBD3] text-xs font-medium flex items-center space-x-1.5 hover:border-[#FF6347] active:scale-95 transition-all' data-cat='Fitness'>
+            <i data-lucide='activity' stroke-width='2.5' class='w-3.5 h-3.5 text-[#9094A0]' style='width: 14px; height: 14px;'></i>
+            <span>Fitness</span>
+          </button>
+          <button type='button' class='category-chip shrink-0 px-3.5 py-2 rounded-full bg-[#1E2026] border border-[#2B2E37] text-[#C8CBD3] text-xs font-medium flex items-center space-x-1.5 hover:border-[#FF6347] active:scale-95 transition-all' data-cat='Run'>
+            <i data-lucide='footprints' stroke-width='2.5' class='w-3.5 h-3.5 text-[#9094A0]' style='width: 14px; height: 14px;'></i>
+            <span>Run</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Section: Live Progress Biometrics (Integrated Linear Bar & Rings) -->
+      <section class='bg-[#1E2026] border border-[#2B2E37] rounded-[22px] p-4 space-y-3.5' aria-label='Today Progress Overview'>
+        <div class='flex items-center justify-between'>
+          <div>
+            <h3 class='text-[14px] font-semibold text-[#F4F4F6]'>Today's Milestones</h3>
+            <p class='text-[11px] text-[#9094A0]'>Synced with Apple Health</p>
+          </div>
+          <span class='px-2.5 py-1 rounded-full bg-[#272A32] text-[10px] font-semibold text-[#34D399] flex items-center space-x-1'>
+            <span class='w-1.5 h-1.5 rounded-full bg-[#34D399]'></span>
+            <span>Live Sync</span>
+          </span>
+        </div>
+
+        <div class='grid grid-cols-3 gap-2.5 pt-1'>
+          <!-- Metric 1: Steps -->
+          <div class='flex flex-col items-center bg-[#181A1F] border border-[#272A32] rounded-[16px] p-2.5 text-center'>
+            <div class='relative w-9 h-9 mb-1.5'>
+              <svg class='w-full h-full transform -rotate-90' viewBox='0 0 36 36'>
+                <path stroke='#2A2D36' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+                <path stroke='#FF6347' stroke-dasharray='72, 100' stroke-linecap='round' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+              </svg>
+              <div class='absolute inset-0 flex items-center justify-center text-[#F4F4F6]'>
+                <i data-lucide='footprints' stroke-width='2.5' class='w-3 h-3 text-[#FF6347]' style='width: 12px; height: 12px;'></i>
+              </div>
+            </div>
+            <span class='text-[12.5px] font-bold text-white tabular-nums'>3,548</span>
+            <span class='text-[9.5px] text-[#9094A0] uppercase tracking-wider'>steps</span>
+          </div>
+
+          <!-- Metric 2: Calories -->
+          <div class='flex flex-col items-center bg-[#181A1F] border border-[#272A32] rounded-[16px] p-2.5 text-center'>
+            <div class='relative w-9 h-9 mb-1.5'>
+              <svg class='w-full h-full transform -rotate-90' viewBox='0 0 36 36'>
+                <path stroke='#2A2D36' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+                <path stroke='#FFB800' stroke-dasharray='52, 100' stroke-linecap='round' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+              </svg>
+              <div class='absolute inset-0 flex items-center justify-center text-[#F4F4F6]'>
+                <i data-lucide='flame' stroke-width='2.5' class='w-3 h-3 text-[#FFB800]' style='width: 12px; height: 12px;'></i>
+              </div>
+            </div>
+            <span class='text-[12.5px] font-bold text-white tabular-nums'>273</span>
+            <span class='text-[9.5px] text-[#9094A0] uppercase tracking-wider'>kcal</span>
+          </div>
+
+          <!-- Metric 3: Time -->
+          <div class='flex flex-col items-center bg-[#181A1F] border border-[#272A32] rounded-[16px] p-2.5 text-center'>
+            <div class='relative w-9 h-9 mb-1.5'>
+              <svg class='w-full h-full transform -rotate-90' viewBox='0 0 36 36'>
+                <path stroke='#2A2D36' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+                <path stroke='#34D399' stroke-dasharray='88, 100' stroke-linecap='round' stroke-width='3.2' fill='none' d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831' />
+              </svg>
+              <div class='absolute inset-0 flex items-center justify-center text-[#F4F4F6]'>
+                <i data-lucide='timer' stroke-width='2.5' class='w-3 h-3 text-[#34D399]' style='width: 12px; height: 12px;'></i>
+              </div>
+            </div>
+            <span class='text-[12.5px] font-bold text-white tabular-nums'>1h 5m</span>
+            <span class='text-[9.5px] text-[#9094A0] uppercase tracking-wider'>active</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Floating Persistent iOS Navigation Capsule Bar -->
+    <nav class='absolute bottom-6 inset-x-4 h-16 bg-[#1A1C21]/90 backdrop-blur-lg border border-[#2B2E37] rounded-full px-4 flex items-center justify-between z-30 shadow-2xl' aria-label='Global App Navigation'>
+      
+      <!-- Tab 1: Home Dashboard -->
+      <button type='button' class='nav-tab-btn flex items-center justify-center w-10 h-10 rounded-full text-[#9094A0] hover:text-white transition-all' data-tab='home'>
+        <i data-lucide='home' stroke-width='2.5' class='w-5 h-5' style='width: 20px; height: 20px;'></i>
+      </button>
+
+      <!-- Tab 2: Workouts (Active in this Variation) -->
+      <button type='button' class='nav-tab-btn flex items-center justify-center w-12 h-10 rounded-full bg-[#FF6347] text-white transition-all' data-tab='workouts'>
+        <i data-lucide='dumbbell' stroke-width='2.5' class='w-5 h-5 text-white' style='width: 20px; height: 20px;'></i>
+      </button>
+
+      <!-- Tab 3: Explore Grid -->
+      <button type='button' class='nav-tab-btn flex items-center justify-center w-10 h-10 rounded-full text-[#9094A0] hover:text-white transition-all' data-tab='explore'>
+        <i data-lucide='layout-grid' stroke-width='2.5' class='w-5 h-5' style='width: 20px; height: 20px;'></i>
+      </button>
+
+      <!-- Tab 4: Calendar Schedule -->
+      <button type='button' class='nav-tab-btn flex items-center justify-center w-10 h-10 rounded-full text-[#9094A0] hover:text-white transition-all' data-tab='schedule'>
+        <i data-lucide='calendar' stroke-width='2.5' class='w-5 h-5' style='width: 20px; height: 20px;'></i>
+      </button>
+
+      <!-- Tab 5: Profile -->
+      <button type='button' class='nav-tab-btn flex items-center justify-center w-10 h-10 rounded-full text-[#9094A0] hover:text-white transition-all' data-tab='profile'>
+        <i data-lucide='user' stroke-width='2.5' class='w-5 h-5' style='width: 20px; height: 20px;'></i>
+      </button>
+
+    </nav>
+
+    <!-- iOS Home Indicator -->
+    <div class='absolute bottom-1.5 inset-x-0 flex justify-center pointer-events-none z-30'>
+      <div class='w-32 h-1 bg-[#5A5D68] rounded-full'></div>
+    </div>
+
+    <!-- Mood Calibration Modal Sheet -->
+    <div id='mood-drawer' class='fixed inset-0 sm:absolute z-50 bg-black/75 backdrop-blur-sm hidden flex flex-col justify-end transition-opacity duration-300 '>
+      <div id='mood-drawer-card' class='bg-[#1E2026] border-t border-[#2B2E37] rounded-t-[32px] p-6 space-y-4 transform translate-y-full transition-transform duration-300'>
+        <div class='w-12 h-1 bg-[#3A3E4A] rounded-full mx-auto -mt-2 mb-2'></div>
+
+        <div class='flex items-center justify-between'>
+          <div>
+            <h3 class='text-lg font-semibold text-white'>Fine-tune Today's Mood</h3>
+            <p class='text-xs text-[#9094A0]'>Adapts recommended workout styles immediately.</p>
+          </div>
+          <button id='close-drawer-btn' type='button' class='w-8 h-8 rounded-full bg-[#272A32] flex items-center justify-center text-[#9094A0] hover:text-white active:scale-90 transition-all'>
+            <i data-lucide='x' stroke-width='2.5' class='w-4 h-4' style='width: 16px; height: 16px;'></i>
+          </button>
+        </div>
+
+        <div class='grid grid-cols-3 gap-2.5'>
+          <button type='button' class='mood-state-btn p-3 rounded-2xl bg-[#272A32] border border-[#353945] flex flex-col items-center text-center space-y-1 active:scale-95 transition-all' data-mood='Energized'>
+            <span class='text-2xl'>🔥</span>
+            <span class='text-xs font-semibold text-white'>Energized</span>
+            <span class='text-[10px] text-[#9094A0]'>HIIT &amp; Power</span>
+          </button>
+          <button type='button' class='mood-state-btn p-3 rounded-2xl bg-[#1E2026] border-2 border-[#FF6347] flex flex-col items-center text-center space-y-1 active:scale-95 transition-all' data-mood='Steady'>
+            <span class='text-2xl'>🌿</span>
+            <span class='text-xs font-semibold text-[#FF6347]'>Steady</span>
+            <span class='text-[10px] text-[#9094A0]'>Flow &amp; Core</span>
+          </button>
+          <button type='button' class='mood-state-btn p-3 rounded-2xl bg-[#272A32] border border-[#353945] flex flex-col items-center text-center space-y-1 active:scale-95 transition-all' data-mood='Exhausted'>
+            <span class='text-2xl'>🌙</span>
+            <span class='text-xs font-semibold text-white'>Restorative</span>
+            <span class='text-[10px] text-[#9094A0]'>Yin &amp; Breath</span>
+          </button>
+        </div>
+
+        <button id='save-mood-state' type='button' class='w-full h-12 rounded-full bg-[#FF6347] text-white font-semibold text-sm flex items-center justify-center space-x-1.5 active:scale-95 transition-all'>
+          <span>Confirm Calibration</span>
+          <i data-lucide='check' stroke-width='2.5' class='w-4 h-4' style='width: 16px; height: 16px;'></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Micro-Notification Toast System -->
+    <aside id='status-toast' class='absolute top-14 inset-x-6 z-50 bg-[#1E2026] border border-[#3A3E4B] rounded-2xl p-3 shadow-2xl flex items-center space-x-3 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none'>
+      <div class='w-8 h-8 rounded-full bg-[#2A4032] text-[#34D399] flex items-center justify-center shrink-0'>
+        <i data-lucide='sparkles' stroke-width='2.5' class='w-4 h-4' style='width: 16px; height: 16px;'></i>
+      </div>
+      <div class='flex-1'>
+        <p id='status-toast-title' class='text-xs font-semibold text-white'>Feed Calibrated</p>
+        <p id='status-toast-msg' class='text-[11px] text-[#9094A0]'>Recommendations refreshed.</p>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Complete Vanilla JavaScript Engine -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Initialize Icons
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+
+      // Micro Toast Notification Controller
+      const toast = document.getElementById('status-toast');
+      const toastTitle = document.getElementById('status-toast-title');
+      const toastMsg = document.getElementById('status-toast-msg');
+      let toastTimer = null;
+
+      function showNotification(title, message) {
+        if (!toast) return;
+        toastTitle.textContent = title;
+        toastMsg.textContent = message;
+        toast.classList.remove('-translate-y-24', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.add('-translate-y-24', 'opacity-0');
+          toast.classList.remove('translate-y-0', 'opacity-100');
+        }, 2500);
+      }
+
+      // 2. True Toggle Switch Interactivity
+      const moodToggleSwitch = document.getElementById('mood-toggle-switch');
+      const moodToggleThumb = document.getElementById('mood-toggle-thumb');
+      const moodModeLabel = document.getElementById('mood-mode-label');
+      let isAdaptive = true;
+
+      if (moodToggleSwitch && moodToggleThumb && moodModeLabel) {
+        moodToggleSwitch.addEventListener('click', () => {
+          isAdaptive = !isAdaptive;
+          if (isAdaptive) {
+            moodToggleSwitch.classList.remove('bg-[#2B2E37]');
+            moodToggleSwitch.classList.add('bg-[#FF6347]');
+            moodToggleThumb.classList.remove('right-[22px]');
+            moodToggleThumb.classList.add('right-0.5');
+            moodModeLabel.textContent = 'Adaptive';
+            showNotification('Mode Active', 'Mood-matching algorithm engaged');
+          } else {
+            moodToggleSwitch.classList.remove('bg-[#FF6347]');
+            moodToggleSwitch.classList.add('bg-[#2B2E37]');
+            moodToggleThumb.classList.remove('right-0.5');
+            moodToggleThumb.classList.add('right-[22px]');
+            moodModeLabel.textContent = 'Standard';
+            showNotification('Standard Mode', 'Showing chronologically scheduled workouts');
+          }
+        });
+      }
+
+      // 3. Like / Heart Action Buttons
+      const likeButtons = document.querySelectorAll('.workout-like-btn');
+      likeButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isLiked = btn.classList.toggle('text-[#FF6347]');
+          if (isLiked) {
+            btn.classList.add('bg-[#FF6347]/20', 'border-[#FF6347]');
+            showNotification('Favorited', 'Session bookmarked in your library');
+          } else {
+            btn.classList.remove('bg-[#FF6347]/20', 'border-[#FF6347]');
+            showNotification('Removed', 'Session unbookmarked');
+          }
+        });
+      });
+
+      // 4. Category Filter Chips
+      const catChips = document.querySelectorAll('.category-chip');
+      catChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          catChips.forEach(c => {
+            c.classList.remove('bg-[#FF6347]', 'text-white');
+            c.classList.add('bg-[#1E2026]', 'text-[#C8CBD3]', 'border-[#2B2E37]');
+            const ic = c.querySelector('i');
+            if (ic) ic.classList.replace('text-white', 'text-[#9094A0]');
+          });
+
+          chip.classList.remove('bg-[#1E2026]', 'text-[#C8CBD3]', 'border-[#2B2E37]');
+          chip.classList.add('bg-[#FF6347]', 'text-white');
+          const activeIcon = chip.querySelector('i');
+          if (activeIcon) activeIcon.classList.replace('text-[#9094A0]', 'text-white');
+
+          showNotification('Filter Selected', `Viewing ${chip.getAttribute('data-cat')} sessions`);
+        });
+      });
+
+      // 5. Drawer Modal Controls
+      const quickMatchCTA = document.getElementById('quick-match-cta');
+      const changeMoodTrigger = document.getElementById('change-mood-trigger');
+      const moodDrawer = document.getElementById('mood-drawer');
+      const moodDrawerCard = document.getElementById('mood-drawer-card');
+      const closeDrawerBtn = document.getElementById('close-drawer-btn');
+      const saveMoodState = document.getElementById('save-mood-state');
+      const moodStateBtns = document.querySelectorAll('.mood-state-btn');
+
+      function openDrawer() {
+        moodDrawer.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          moodDrawer.classList.remove('opacity-0');
+          moodDrawerCard.classList.remove('translate-y-full');
+        });
+      }
+
+      function closeDrawer() {
+        moodDrawer.classList.add('opacity-0');
+        moodDrawerCard.classList.add('translate-y-full');
+        setTimeout(() => {
+          moodDrawer.classList.add('hidden');
+        }, 300);
+      }
+
+      if (quickMatchCTA) quickMatchCTA.addEventListener('click', openDrawer);
+      if (changeMoodTrigger) changeMoodTrigger.addEventListener('click', openDrawer);
+      if (closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeDrawer);
+
+      if (moodDrawer) {
+        moodDrawer.addEventListener('click', (e) => {
+          if (e.target === moodDrawer) closeDrawer();
+        });
+      }
+
+      let selectedMood = 'Steady';
+      moodStateBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          moodStateBtns.forEach(b => {
+            b.classList.remove('border-2', 'border-[#FF6347]', 'bg-[#1E2026]');
+            b.classList.add('bg-[#272A32]', 'border-[#353945]');
+            const txt = b.querySelector('.font-semibold');
+            if (txt) {
+              txt.classList.remove('text-[#FF6347]');
+              txt.classList.add('text-white');
+            }
+          });
+
+          btn.classList.remove('bg-[#272A32]', 'border-[#353945]');
+          btn.classList.add('border-2', 'border-[#FF6347]', 'bg-[#1E2026]');
+          const activeTxt = btn.querySelector('.font-semibold');
+          if (activeTxt) {
+            activeTxt.classList.remove('text-white');
+            activeTxt.classList.add('text-[#FF6347]');
+          }
+
+          selectedMood = btn.getAttribute('data-mood');
+        });
+      });
+
+      if (saveMoodState) {
+        saveMoodState.addEventListener('click', () => {
+          closeDrawer();
+          showNotification('Calibration Updated', `Feed tailored for ${selectedMood} tempo.`);
+        });
+      }
+
+      // 6. Navigation Bar Tab Switching
+      const navTabs = document.querySelectorAll('.nav-tab-btn');
+      navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          navTabs.forEach(t => {
+            t.classList.remove('bg-[#FF6347]', 'text-white', 'w-12');
+            t.classList.add('text-[#9094A0]', 'w-10');
+            const ic = t.querySelector('i');
+            if (ic) ic.classList.replace('text-white', 'text-[#9094A0]');
+          });
+
+          tab.classList.remove('text-[#9094A0]', 'w-10');
+          tab.classList.add('bg-[#FF6347]', 'text-white', 'w-12');
+          const curIc = tab.querySelector('i');
+          if (curIc) curIc.classList.replace('text-[#9094A0]', 'text-white');
+
+          const tabId = tab.getAttribute('data-tab');
+          showNotification('Navigating', `Switching to ${tabId}`);
+        });
+      });
+
+      // 7. Start Workout Buttons
+      const startButtons = document.querySelectorAll('.start-workout-btn');
+      startButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          showNotification('Starting Session', 'Preparing warm-up countdown...');
+        });
+      });
+
+      // 8. Search Input Interactions
+      const searchField = document.getElementById('search-input-field');
+      if (searchField) {
+        searchField.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && searchField.value.trim().length > 0) {
+            showNotification('Search', `Finding workouts matching \"${searchField.value.trim()}\"`);
+          }
+        });
+      }
+    });
+  </script>
+
+<!-- __CANVAS_INTERACTIVITY_HELPER__ -->
+<script>
+(function() {
+  function initInteractivity() {
+    // 1. Mobile Menu / Sidebar toggles
+    var menuTriggers = document.querySelectorAll(
+      '[data-toggle="sidebar"], [data-toggle="mobile-menu"], [data-toggle="menu"], ' +
+      '#mobile-menu-btn, #mobile-menu-button, #menu-btn, #hamburger, [data-menu-toggle]'
+    );
+    var menuTargets = document.querySelectorAll(
+      '#mobile-sidebar, #mobile-menu, #mobile-nav, [data-menu-target], aside[id*="sidebar"]'
+    );
+    var overlays = document.querySelectorAll('#mobile-overlay, [data-menu-overlay]');
+
+    if (menuTriggers.length > 0 && menuTargets.length > 0) {
+      menuTriggers.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          menuTargets.forEach(function(target) {
+            if (target.classList.contains('-translate-x-full')) {
+              target.classList.remove('-translate-x-full');
+              target.classList.add('translate-x-0');
+            } else if (target.classList.contains('translate-x-0')) {
+              target.classList.remove('translate-x-0');
+              target.classList.add('-translate-x-full');
+            } else {
+              target.classList.toggle('hidden');
+            }
+          });
+          overlays.forEach(function(ov) {
+            ov.classList.toggle('hidden');
+          });
+        });
+      });
+
+      overlays.forEach(function(ov) {
+        ov.addEventListener('click', function() {
+          menuTargets.forEach(function(target) {
+            target.classList.add('-translate-x-full');
+            target.classList.remove('translate-x-0');
+            target.classList.add('hidden');
+          });
+          ov.classList.add('hidden');
+        });
+      });
+    }
+
+    // 2. Generic data-toggle target
+    document.querySelectorAll('[data-toggle]').forEach(function(el) {
+      var targetSelector = el.getAttribute('data-target') || el.getAttribute('data-toggle');
+      if (!targetSelector || targetSelector === 'sidebar' || targetSelector === 'mobile-menu') return;
+      var target = document.querySelector(targetSelector) || document.getElementById(targetSelector);
+      if (target) {
+        el.addEventListener('click', function(e) {
+          e.preventDefault();
+          target.classList.toggle('hidden');
+        });
+      }
+    });
+
+    // 3. Accordions / FAQ toggles
+    document.querySelectorAll('[data-accordion-target], .accordion-trigger, [aria-expanded]').forEach(function(trigger) {
+      trigger.addEventListener('click', function() {
+        var isExpanded = trigger.getAttribute('aria-expanded') === 'true';
+        trigger.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+        var targetSelector = trigger.getAttribute('data-accordion-target') || trigger.getAttribute('aria-controls');
+        var content = targetSelector ? document.querySelector(targetSelector) : trigger.nextElementSibling;
+        if (content) {
+          content.classList.toggle('hidden');
+        }
+      });
+    });
+
+    // 4. Modal & Dialog visibility-synced interactivity: an invisible
+    // (opacity: 0) full-screen modal/dialog backdrop must NEVER intercept
+    // clicks meant for the page behind it. Extremely common AI-generated
+    // pattern: a `fixed inset-0 ... opacity-0` backdrop toggled to
+    // opacity-100 by the page's own JS on open, with NO pointer-events
+    // management of its own (relying solely on opacity to "hide" it,
+    // which hides it visually but NOT from hit-testing/click interception
+    // — a plain CSS fact independent of any script here). The old version
+    // of this safeguard unconditionally forced pointer-events:auto on
+    // every match, ONE TIME, at load — confirmed real: on a closed
+    // `#checkout-modal` (opacity-0, fixed inset-0 z-50, no
+    // pointer-events-none to begin with) this made an invisible,
+    // full-viewport div intercept EVERY click on the page behind it,
+    // including Canvas pick-mode element selection. Sync each match's
+    // OWN pointer-events (and its interactive descendants') to its LIVE
+    // computed visibility instead — 'none' while invisible, 'auto' once
+    // shown — and re-sync whenever its class/style changes, so opening
+    // the modal (which only ever toggles opacity/scale classes) also
+    // correctly re-enables it, and a stuck pointer-events-none on an
+    // ALREADY-visible modal (the original bug this safeguard was written
+    // for) still gets cleared via the inline style override.
+    //
+    // Visibility MUST be ancestor-aware, not own-opacity-only. Confirmed
+    // real: the selector below matches NESTED nodes too (e.g.
+    // `#checkout-modal-card` inside `#checkout-modal`, plus every
+    // `[class*="modal"]` descendant). A nested card keeps its own
+    // `opacity: 1` while the ANCESTOR backdrop is at `opacity: 0`, so an
+    // own-opacity test called it "visible" and re-forced pointer-events:auto
+    // on it — and on its inner buttons — making a hit target spanning the
+    // middle of the viewport out of a modal nobody could see. That is the
+    // post-revise "buttons become unclickable / handlers never fire" bug.
+    // `isElementVisible` walks ancestors (opacity/display/visibility) so
+    // nested matches inherit their backdrop's invisibility. The ancestor
+    // walk runs FIRST and unconditionally: inlining an ancestor's opacity
+    // into a single own-node check is exactly the bug above, and
+    // `checkVisibility`'s own ancestor handling differs between engines,
+    // so it is only used afterwards as an extra signal for
+    // `content-visibility: hidden` subtrees. `contentVisibilityAuto` is
+    // deliberately NOT passed: `content-visibility: auto` makes
+    // `checkVisibility` report an off-screen element as invisible, and
+    // nothing here re-syncs on SCROLL (every trigger below is a class/style
+    // mutation or a transition end), so that would pin an off-screen modal
+    // branch to pointer-events:none and leave it stuck once scrolled into
+    // view — the same class of stuck-interactivity state this whole
+    // safeguard exists to prevent. Plain `content-visibility: hidden` is
+    // static, so it carries no such risk.
+    function isElementVisible(el) {
+      var node = el;
+      while (node && node.nodeType === 1) {
+        var style = window.getComputedStyle(node);
+        if (style.opacity === '0' || style.display === 'none' || style.visibility === 'hidden') {
+          return false;
+        }
+        node = node.parentElement;
+      }
+      if (typeof el.checkVisibility === 'function') {
+        try {
+          return el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        } catch {}
+      }
+      return true;
+    }
+    // Never write an unchanged value: this same function is driven by
+    // MutationObservers (below), and a redundant write would re-trigger the
+    // observer that called it, for no state change.
+    function setPointerEvents(el, value) {
+      if (el.style.pointerEvents !== value) el.style.pointerEvents = value;
+    }
+    function syncModalPointerEvents(modal) {
+      var visible = isElementVisible(modal);
+      setPointerEvents(modal, visible ? 'auto' : 'none');
+      modal.querySelectorAll('input, select, textarea, button, form, .bg-card').forEach(function(el) {
+        setPointerEvents(el, visible ? 'auto' : 'none');
+      });
+    }
+    // Re-sync a match AND every nested match: the selector below matches
+    // both a backdrop (`#checkout-modal`) and cards nested inside it
+    // (`#checkout-modal-card`). A nested match's own inline pointer-events
+    // only goes stale when its own class/style does not change while the
+    // ANCESTOR's does — opening/closing a modal that toggles the card's
+    // scale classes together with the backdrop's opacity is covered, but
+    // the Canvas live-patching the document after an AI revision is not,
+    // and a stale `auto` there keeps an invisible card intercepting clicks
+    // in the middle of the viewport (confirmed live: card inline
+    // `pointer-events: auto` next to a closed `#checkout-modal`). So a
+    // backdrop's re-sync also fixes everything nested inside it.
+    var MODAL_SELECTOR = '[id*="modal"], [id*="dialog"], [class*="modal"], [class*="dialog"]';
+    function resyncModalBranch(modal) {
+      syncModalPointerEvents(modal);
+      modal.querySelectorAll(MODAL_SELECTOR).forEach(syncModalPointerEvents);
+    }
+    function sweepModalPointerEvents() {
+      document.querySelectorAll(MODAL_SELECTOR).forEach(resyncModalBranch);
+    }
+    document.querySelectorAll(MODAL_SELECTOR).forEach(function(modal) {
+      syncModalPointerEvents(modal);
+      // The mutation-triggered check fires the instant a class/style
+      // change is MADE, not when it takes visual effect — for a
+      // `transition-opacity` modal (very common, e.g. `transition-opacity
+      // duration-200`), getComputedStyle().opacity at that exact instant
+      // can still read the STARTING value of the animation, not the
+      // target, so a fading-IN modal got read as "still invisible" and
+      // stuck at pointer-events:none. `transitionend` covers browsers
+      // that fire it reliably; the fixed re-checks below are a fallback
+      // net (mirrors this file's own Lucide-icon fix above, which uses
+      // the same fixed-delay-retry pattern for the same class of
+      // animation/timing-uncertainty problem) so this still converges
+      // even if a transition never completes or its end event is missed.
+      function resync() { resyncModalBranch(modal); }
+      if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(function() {
+          resync();
+          setTimeout(resync, 250);
+          setTimeout(resync, 600);
+        }).observe(modal, { attributes: true, attributeFilter: ['class', 'style'] });
+      }
+      modal.addEventListener('transitionend', function(e) {
+        if (e.propertyName === 'opacity') resync();
+      });
+    });
+
+    // Document-level safety net for the case no per-match observer can see:
+    // the Canvas replaces a section wholesale (after an AI revision, or on
+    // the user typing in the code editor) without mutating the matched
+    // element's own attributes, leaving its inline pointer-events stale.
+    // Same debounced-observer shape as the Lucide observer in the head shim
+    // above — including its "nothing to do, bail out" guard — so it stays
+    // inert on documents without modals. The debounce also keeps the sweep
+    // off the mutation path of a class-heavy animation.
+    if (typeof MutationObserver !== 'undefined' && document.body) {
+      var modalSyncTimer = null;
+      new MutationObserver(function() {
+        if (document.querySelectorAll(MODAL_SELECTOR).length === 0) return;
+        clearTimeout(modalSyncTimer);
+        modalSyncTimer = setTimeout(sweepModalPointerEvents, 120);
+      }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+    }
+
+    // 5. Lucide icons fallback initialization if loaded
+    if (typeof window.lucide !== 'undefined' && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initInteractivity);
+  } else {
+    initInteractivity();
+  }
+})();
+</script>
+
+</body>
+</html>
