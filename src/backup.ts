@@ -12,6 +12,12 @@ export function createBackup(profileName: string, activities: Activity[], export
   return JSON.stringify({ version: 1, exportedAt, profileName: profileName.trim(), activities } satisfies Backup);
 }
 
+export function backupFilename(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return `terakhir-kali-backup-${date}-${pad(now.getHours())}${pad(now.getMinutes())}.json`;
+}
+
 export function readBackup(raw: string): Backup {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { throw new Error('File backup tidak dapat dibaca.'); }

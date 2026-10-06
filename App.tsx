@@ -1,7 +1,7 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Appearance, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Appearance, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
@@ -10,6 +10,7 @@ import { mergeActivities } from './src/backup';
 import { exportBackup, importBackup } from './src/backup-file';
 import { resetCopy } from './src/interaction-copy';
 import { loadProfileName, saveProfileName } from './src/profile';
+import { cancelReminder, scheduleReminder } from './src/reminders';
 import { loadActivities, saveActivities } from './src/storage';
 
 type FormMode = 'add' | 'edit';
@@ -34,8 +35,10 @@ export default function App() {
   const [editing, setEditing] = useState<Activity | null>(null);
   const [title, setTitle] = useState('');
   const [lastDoneAt, setLastDoneAt] = useState(today);
+  const [reminderAt, setReminderAt] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [iosPickerVisible, setIosPickerVisible] = useState(false);
+  const [iosReminderPickerVisible, setIosReminderPickerVisible] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
 
@@ -59,8 +62,8 @@ export default function App() {
   }, [notice]);
 
   function openSettings() { setProfileDraft(profileName); setSettingsVisible(true); }
-  function openAdd() { setFormMode('add'); setEditing(null); setTitle(''); setLastDoneAt(today); setFormError(''); setFormVisible(true); }
-  function openEdit(item: Activity) { setFormMode('edit'); setEditing(item); setTitle(item.title); setLastDoneAt(item.lastDoneAt); setFormError(''); setFormVisible(true); }
+  function openAdd() { setFormMode('add'); setEditing(null); setTitle(''); setLastDoneAt(today); setReminderAt(null); setFormError(''); setFormVisible(true); }
+  function openEdit(item: Activity) { setFormMode('edit'); setEditing(item); setTitle(item.title); setLastDoneAt(item.lastDoneAt); setReminderAt(item.reminderAt ?? null); setFormError(''); setFormVisible(true); }
 
   async function saveProfile() {
     try {
@@ -71,8 +74,11 @@ export default function App() {
       setNotice({ message: next ? 'Profil lokal disimpan.' : 'Nama profil dihapus.', tone: 'success' });
     } catch { setNotice({ message: 'Profil belum dapat disimpan.', tone: 'danger' }); }
   }
-  async function shareBackup() {
-    try { await exportBackup(profileName, activities); setNotice({ message: 'File backup siap dibagikan.', tone: 'success' }); }
+  async function saveBackup() {
+    try {
+      const name = await exportBackup(profileName, activities);
+      ToastAndroid.show(`Backup tersimpan di Download: ${name}`, ToastAndroid.LONG);
+    }
     catch { setNotice({ message: 'Backup belum dapat dibuat. Coba lagi.', tone: 'danger' }); }
   }
   async function restoreBackup() {
@@ -86,14 +92,23 @@ export default function App() {
     } catch (error) { setNotice({ message: error instanceof Error ? error.message : 'Backup belum dapat diimpor.', tone: 'danger' }); }
   }
   async function submit() {
-    const errors = validateActivityInput(title, lastDoneAt, today);
-    if (errors.title || errors.lastDoneAt) { setFormError(errors.title ?? errors.lastDoneAt ?? 'Periksa lagi isianmu.'); return; }
+    const errors = validateActivityInput(title, lastDoneAt, today, reminderAt ?? undefined);
+    if (errors.title || errors.lastDoneAt || errors.reminderAt) { setFormError(errors.title ?? errors.lastDoneAt ?? errors.reminderAt ?? 'Periksa lagi isianmu.'); return; }
     const now = new Date().toISOString();
-    const next = editing
-      ? activities.map((item) => item.id === editing.id ? { ...item, title: title.trim(), lastDoneAt, updatedAt: now } : item)
-      : [...activities, { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, title: title.trim(), lastDoneAt, createdAt: now, updatedAt: now }];
-    try { await persist(next); setFormVisible(false); setNotice({ message: editing ? 'Aktivitas diperbarui.' : 'Aktivitas ditambahkan.', tone: 'success' }); }
-    catch { setFormError('Perubahan belum dapat disimpan. Coba lagi.'); }
+    const id = editing?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let notificationId: string | undefined;
+    try {
+      if (reminderAt) notificationId = await scheduleReminder(title.trim(), reminderAt, id);
+      const nextActivity: Activity = { id, title: title.trim(), lastDoneAt, createdAt: editing?.createdAt ?? now, updatedAt: now, ...(reminderAt ? { reminderAt, notificationId } : {}) };
+      const next = editing ? activities.map((item) => item.id === id ? nextActivity : item) : [...activities, nextActivity];
+      await persist(next);
+      try { await cancelReminder(editing?.notificationId); } catch { /* The new reminder is already saved. */ }
+      setFormVisible(false);
+      setNotice({ message: editing ? 'Aktivitas diperbarui.' : 'Aktivitas ditambahkan.', tone: 'success' });
+    } catch (error) {
+      if (notificationId) await cancelReminder(notificationId);
+      setFormError(error instanceof Error ? error.message : 'Perubahan belum dapat disimpan. Coba lagi.');
+    }
   }
   function chooseDate() {
     const value = fromCalendarDate(lastDoneAt);
@@ -103,28 +118,49 @@ export default function App() {
     }
     setIosPickerVisible(true);
   }
+  function chooseReminder() {
+    const value = reminderAt ? new Date(reminderAt) : nextReminderDate();
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({ value, mode: 'date', minimumDate: new Date(), onValueChange: (_, date) => {
+        if (!date) return;
+        DateTimePickerAndroid.open({ value: date, mode: 'time', onValueChange: (_, time) => {
+          if (!time) return;
+          setReminderAt(new Date(date.getFullYear(), date.getMonth(), date.getDate(), time.getHours(), time.getMinutes()).toISOString());
+        }});
+      }});
+      return;
+    }
+    setIosReminderPickerVisible(true);
+  }
   function requestReset(item: Activity) {
     const copy = resetCopy(item.title);
     setConfirm({ title: copy.confirmTitle, body: copy.confirmBody, action: copy.confirmAction, tone: 'forest', onConfirm: () => void reset(item, copy.success) });
   }
   async function reset(item: Activity, message: string) {
-    const previousDate = item.lastDoneAt;
     setConfirm(null);
     try {
-      await persist(activities.map((entry) => entry.id === item.id ? { ...entry, lastDoneAt: today, updatedAt: new Date().toISOString() } : entry));
-      setNotice({ message, tone: 'success', undo: () => void undoReset(item.id, previousDate) });
+      await cancelReminder(item.notificationId);
+      await persist(activities.map((entry) => entry.id === item.id ? { ...entry, lastDoneAt: today, updatedAt: new Date().toISOString(), reminderAt: undefined, notificationId: undefined } : entry));
+      setNotice({ message, tone: 'success', undo: () => void undoReset(item) });
     } catch { setNotice({ message: 'Catatan belum dapat disimpan. Coba lagi.', tone: 'danger' }); }
   }
-  async function undoReset(id: string, previousDate: string) {
+  async function undoReset(previous: Activity) {
+    let notificationId: string | undefined;
     try {
-      await persist(activities.map((item) => item.id === id ? { ...item, lastDoneAt: previousDate, updatedAt: new Date().toISOString() } : item));
+      const reminderAt = previous.reminderAt && new Date(previous.reminderAt) > new Date() ? previous.reminderAt : undefined;
+      notificationId = reminderAt ? await scheduleReminder(previous.title, reminderAt, previous.id) : undefined;
+      const restored: Activity = { ...previous, updatedAt: new Date().toISOString(), ...(reminderAt ? { reminderAt, notificationId } : { reminderAt: undefined, notificationId: undefined }) };
+      await persist(activities.map((item) => item.id === previous.id ? restored : item));
       setNotice({ message: 'Tanggal sebelumnya dipulihkan.', tone: 'success' });
-    } catch { setNotice({ message: 'Undo belum dapat disimpan.', tone: 'danger' }); }
+    } catch {
+      if (notificationId) await cancelReminder(notificationId);
+      setNotice({ message: 'Undo belum dapat disimpan.', tone: 'danger' });
+    }
   }
   function requestDelete(item: Activity) { setConfirm({ title: 'Hapus aktivitas?', body: `Hapus “${item.title}”? Tindakan ini tidak dapat dibatalkan.`, action: 'Hapus aktivitas', tone: 'coral', onConfirm: () => void remove(item.id) }); }
   async function remove(id: string) {
     setConfirm(null);
-    try { await persist(activities.filter((item) => item.id !== id)); setNotice({ message: 'Aktivitas dihapus.', tone: 'danger' }); }
+    try { const item = activities.find((activity) => activity.id === id); await cancelReminder(item?.notificationId); await persist(activities.filter((item) => item.id !== id)); setNotice({ message: 'Aktivitas dihapus.', tone: 'danger' }); }
     catch { setNotice({ message: 'Aktivitas belum dapat dihapus. Coba lagi.', tone: 'danger' }); }
   }
 
@@ -140,9 +176,9 @@ export default function App() {
     {status === 'error' ? <State title="Catatan belum bisa dibaca" copy="Data tidak dihapus. Coba muat ulang dulu." colors={colors} action="Muat ulang" onAction={() => void restore()} /> : <FlatList data={sorted} keyExtractor={(item) => item.id} contentContainerStyle={sorted.length ? styles.list : styles.emptyList} ListHeaderComponent={sorted.length ? <Text style={[styles.section, { color: colors.text }]}>Yang paling lama</Text> : null} ListEmptyComponent={<State title="Belum ada yang dicatat" copy="Tambahkan satu hal yang ingin kamu ingat, kapan terakhir melakukannya." colors={colors} action="Tambah aktivitas" onAction={openAdd} />} renderItem={({ item }) => <ActivityRow item={item} today={today} colors={colors} onEdit={() => openEdit(item)} onReset={() => requestReset(item)} onDelete={() => requestDelete(item)} />} />}
     <Pressable onPress={openAdd} style={[styles.add, { backgroundColor: colors.coral }]}><PlusIcon /><Text style={styles.primaryText}>Tambah aktivitas</Text></Pressable>
     {notice && <NoticeBar notice={notice} colors={colors} onClose={() => setNotice(null)} />}
-    <Modal visible={formVisible} animationType="slide" transparent onRequestClose={() => setFormVisible(false)}><KeyboardAvoidingView style={styles.scrim} behavior="padding"><View style={[styles.sheet, { backgroundColor: colors.bg }]}><Text style={[styles.sheetTitle, { color: colors.text }]}>{formMode === 'add' ? 'Tambah aktivitas' : 'Ubah aktivitas'}</Text><Text style={[styles.label, { color: colors.muted }]}>Apa yang ingin kamu ingat?</Text><TextInput value={title} onChangeText={setTitle} placeholder="Misalnya, Telepon Ibu" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]} maxLength={80} autoFocus /><Text style={[styles.label, { color: colors.muted }]}>Kapan terakhir dilakukan?</Text><Pressable onPress={chooseDate} style={[styles.datePicker, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.dateValue, { color: colors.text }]}>{displayDate(lastDoneAt)}</Text><Text style={[styles.dateChange, { color: colors.coral }]}>Pilih tanggal</Text></Pressable><Text style={[styles.hint, { color: colors.muted }]}>Awalnya hari ini. Kamu bisa memilih tanggal sebelumnya.</Text>{Platform.OS === 'ios' && iosPickerVisible && <DateTimePicker value={fromCalendarDate(lastDoneAt)} mode="date" maximumDate={new Date()} display="inline" onValueChange={(_, date) => { if (date) setLastDoneAt(localCalendarDate(date)); }} />}{Boolean(formError) && <Text style={{ color: colors.danger }}>{formError}</Text>}<View style={styles.actions}><Pressable onPress={() => setFormVisible(false)} style={[styles.secondary, { borderColor: colors.border }]}><Text style={{ color: colors.text }}>Batal</Text></Pressable><Pressable onPress={() => void submit()} style={[styles.primary, { backgroundColor: colors.coral }]}><Text style={styles.primaryText}>Simpan</Text></Pressable></View></View></KeyboardAvoidingView></Modal>
+    <Modal visible={formVisible} animationType="slide" transparent onRequestClose={() => setFormVisible(false)}><KeyboardAvoidingView style={styles.scrim} behavior="padding"><View style={[styles.sheet, { backgroundColor: colors.bg }]}><Text style={[styles.sheetTitle, { color: colors.text }]}>{formMode === 'add' ? 'Tambah aktivitas' : 'Ubah aktivitas'}</Text><Text style={[styles.label, { color: colors.muted }]}>Apa yang ingin kamu ingat?</Text><TextInput value={title} onChangeText={setTitle} placeholder="Misalnya, Telepon Ibu" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]} maxLength={80} autoFocus /><Text style={[styles.label, { color: colors.muted }]}>Kapan terakhir dilakukan?</Text><Pressable onPress={chooseDate} style={[styles.datePicker, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.dateValue, { color: colors.text }]}>{displayDate(lastDoneAt)}</Text><Text style={[styles.dateChange, { color: colors.coral }]}>Pilih tanggal</Text></Pressable><Text style={[styles.hint, { color: colors.muted }]}>Awalnya hari ini. Kamu bisa memilih tanggal sebelumnya.</Text><Text style={[styles.label, { color: colors.muted }]}>Pengingat lembut (opsional)</Text><Pressable onPress={chooseReminder} style={[styles.datePicker, { borderColor: colors.border, backgroundColor: colors.surface }]}><Text style={[styles.dateValue, { color: colors.text }]}>{reminderAt ? displayReminderDate(reminderAt) : 'Tidak ada pengingat'}</Text><Text style={[styles.dateChange, { color: colors.coral }]}>{reminderAt ? 'Ubah waktu' : 'Pilih waktu'}</Text></Pressable>{reminderAt && <Pressable onPress={() => setReminderAt(null)} style={styles.clearReminder}><Text style={{ color: colors.coral }}>Hapus pengingat</Text></Pressable>}<Text style={[styles.hint, { color: colors.muted }]}>Satu pengingat saja. Tidak berulang dan tidak otomatis untuk aktivitas lain.</Text>{Platform.OS === 'ios' && iosPickerVisible && <DateTimePicker value={fromCalendarDate(lastDoneAt)} mode="date" maximumDate={new Date()} display="inline" onValueChange={(_, date) => { if (date) setLastDoneAt(localCalendarDate(date)); }} />}{Platform.OS === 'ios' && iosReminderPickerVisible && <DateTimePicker value={reminderAt ? new Date(reminderAt) : nextReminderDate()} mode="datetime" minimumDate={new Date()} display="inline" onValueChange={(_, date) => { if (date) setReminderAt(date.toISOString()); }} />}{Boolean(formError) && <Text style={{ color: colors.danger }}>{formError}</Text>}<View style={styles.actions}><Pressable onPress={() => setFormVisible(false)} style={[styles.secondary, { borderColor: colors.border }]}><Text style={{ color: colors.text }}>Batal</Text></Pressable><Pressable onPress={() => void submit()} style={[styles.primary, { backgroundColor: colors.coral }]}><Text style={styles.primaryText}>Simpan</Text></Pressable></View></View></KeyboardAvoidingView></Modal>
     <ConfirmSheet confirm={confirm} colors={colors} onCancel={() => setConfirm(null)} />
-    <Modal visible={settingsVisible} animationType="slide" transparent onRequestClose={() => setSettingsVisible(false)}><KeyboardAvoidingView style={styles.settingsScrim} behavior="padding"><View style={[styles.sheet, styles.settingsSheet, { backgroundColor: colors.bg }]}><ScrollView style={styles.settingsScroll} contentContainerStyle={styles.settingsContent} keyboardShouldPersistTaps="handled"><Text style={[styles.sheetTitle, { color: colors.text }]}>Profil dan backup</Text><Text style={[styles.label, { color: colors.muted }]}>Nama profil lokal</Text><TextInput value={profileDraft} onChangeText={setProfileDraft} placeholder="Misalnya, Raid" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]} maxLength={40} /><Text style={[styles.hint, { color: colors.muted }]}>Bukan akun login. Data tetap ada di HP ini sampai kamu membuat backup.</Text><Pressable onPress={() => void shareBackup()} style={[styles.backupAction, { backgroundColor: colors.forest }]}><Text style={styles.primaryText}>Export backup</Text></Pressable><Pressable onPress={() => void restoreBackup()} style={[styles.backupAction, { borderColor: colors.border }]}><Text style={{ color: colors.text, fontWeight: '700' }}>Import dan gabungkan backup</Text></Pressable><Text style={[styles.hint, { color: colors.muted }]}>Import menambahkan data baru dan memakai perubahan terbaru bila ID sama. Data sekarang tidak dihapus.</Text><Text style={[styles.backupWarning, { color: colors.muted }]}>Simpan backup sebelum menghapus aplikasi atau berpindah HP.</Text><View style={styles.themeRow}><Text style={[styles.label, { color: colors.muted }]}>Tema</Text><Pressable accessibilityLabel={darkMode ? 'Gunakan tema terang' : 'Gunakan tema gelap'} onPress={() => setDarkMode((value) => !value)} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>{darkMode ? <SunIcon color={colors.text} /> : <MoonIcon color={colors.text} />}</Pressable></View></ScrollView><ProfileActions colors={colors} onCancel={() => setSettingsVisible(false)} onSave={() => void saveProfile()} /></View></KeyboardAvoidingView></Modal>
+    <Modal visible={settingsVisible} animationType="slide" transparent onRequestClose={() => setSettingsVisible(false)}><KeyboardAvoidingView style={styles.settingsScrim} behavior="padding"><View style={[styles.sheet, styles.settingsSheet, { backgroundColor: colors.bg }]}><ScrollView style={styles.settingsScroll} contentContainerStyle={styles.settingsContent} keyboardShouldPersistTaps="handled"><Text style={[styles.sheetTitle, { color: colors.text }]}>Profil dan backup</Text><Text style={[styles.label, { color: colors.muted }]}>Nama profil lokal</Text><TextInput value={profileDraft} onChangeText={setProfileDraft} placeholder="Misalnya, Raid" placeholderTextColor={colors.muted} style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]} maxLength={40} /><Text style={[styles.hint, { color: colors.muted }]}>Bukan akun login. Data tetap ada di HP ini sampai kamu membuat backup.</Text><Pressable onPress={() => void saveBackup()} style={[styles.backupAction, { backgroundColor: colors.forest }]}><Text style={styles.primaryText}>Export backup</Text></Pressable><Pressable onPress={() => void restoreBackup()} style={[styles.backupAction, { borderColor: colors.border }]}><Text style={{ color: colors.text, fontWeight: '700' }}>Import dan gabungkan backup</Text></Pressable><Text style={[styles.hint, { color: colors.muted }]}>Import menambahkan data baru dan memakai perubahan terbaru bila ID sama. Data sekarang tidak dihapus.</Text><Text style={[styles.backupWarning, { color: colors.muted }]}>Simpan backup sebelum menghapus aplikasi atau berpindah HP.</Text><View style={styles.themeRow}><Text style={[styles.label, { color: colors.muted }]}>Tema</Text><Pressable accessibilityLabel={darkMode ? 'Gunakan tema terang' : 'Gunakan tema gelap'} onPress={() => setDarkMode((value) => !value)} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>{darkMode ? <SunIcon color={colors.text} /> : <MoonIcon color={colors.text} />}</Pressable></View></ScrollView><ProfileActions colors={colors} onCancel={() => setSettingsVisible(false)} onSave={() => void saveProfile()} /></View></KeyboardAvoidingView></Modal>
   </SafeAreaView></SafeAreaProvider>;
 }
 
@@ -177,9 +213,11 @@ function LeafIcon() { return <Svg width={26} height={26} viewBox="0 0 24 24" fil
 function SunIcon({ color }: { color: string }) { return <Svg width={22} height={22} viewBox="0 0 24 24" fill="none"><Circle cx="12" cy="12" r="3.5" stroke={color} strokeWidth="1.8" /><Path d="M12 2.5v2M12 19.5v2M21.5 12h-2M4.5 12h-2M18.72 5.28l-1.42 1.42M6.7 17.3l-1.42 1.42M18.72 18.72 17.3 17.3M6.7 6.7 5.28 5.28" stroke={color} strokeWidth="1.8" strokeLinecap="round" /></Svg>; }
 function MoonIcon({ color }: { color: string }) { return <Svg width={22} height={22} viewBox="0 0 24 24" fill="none"><Path d="M20.5 15.1A8.5 8.5 0 0 1 8.9 3.5 8.5 8.5 0 1 0 20.5 15.1Z" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></Svg>; }
 function greeting(now = new Date()) { const hour = now.getHours(); if (hour < 11) return 'Selamat pagi'; if (hour < 15) return 'Selamat siang'; if (hour < 18) return 'Selamat sore'; return 'Selamat malam'; }
+function nextReminderDate() { const date = new Date(); date.setDate(date.getDate() + 1); date.setHours(9, 0, 0, 0); return date; }
 function fromCalendarDate(value: string) { const [year, month, day] = value.split('-').map(Number); return new Date(year, month - 1, day); }
 function displayDate(value: string) { return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(fromCalendarDate(value)); }
+function displayReminderDate(value: string) { return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 
 const styles = StyleSheet.create({
-  app:{flex:1,paddingHorizontal:16,paddingTop:12}, iconButton:{width:48,height:48,borderWidth:1,borderRadius:14,alignItems:'center',justifyContent:'center'}, profileLabel:{fontSize:14,marginTop:5}, loading:{flex:1,alignItems:'center',justifyContent:'center',gap:12},loadingName:{fontFamily:'Georgia',fontSize:28},loadingCopy:{fontSize:14}, header:{paddingTop:18,flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'}, brand:{flex:1,flexDirection:'row',alignItems:'center',gap:10,paddingRight:12}, eyebrow:{fontSize:10,fontWeight:'700',letterSpacing:1.5}, title:{fontFamily:'Georgia',fontSize:27,lineHeight:31,marginTop:4}, theme:{minHeight:44,paddingHorizontal:12,borderWidth:1,borderRadius:10,justifyContent:'center'}, themeRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:8}, banner:{borderRadius:24,padding:20,marginTop:24,marginBottom:20,overflow:'hidden'}, bannerLeaf:{position:'absolute',right:18,bottom:18,opacity:.8}, bannerTitle:{fontFamily:'Georgia',fontSize:23,lineHeight:28}, bannerCopy:{fontSize:14,lineHeight:20,marginTop:12,maxWidth:280,opacity:.9}, section:{fontSize:16,fontWeight:'700',marginBottom:10}, list:{paddingBottom:86}, emptyList:{flexGrow:1,justifyContent:'center',paddingBottom:90}, card:{borderWidth:1,borderRadius:16,padding:14,marginBottom:10,flexDirection:'row',gap:12}, cardText:{flex:1,minHeight:94,justifyContent:'center'}, activityHeading:{flexDirection:'row',alignItems:'center',gap:8}, cardTitle:{flexShrink:1,fontSize:16,fontWeight:'700'}, editLink:{fontSize:12,fontWeight:'700'}, lastDone:{flexDirection:'row',alignItems:'center',gap:5,marginTop:6}, date:{fontSize:12}, cardSide:{width:154,alignItems:'flex-end',gap:8}, elapsedRow:{flexDirection:'row',alignItems:'center',gap:5}, elapsed:{fontWeight:'700'}, reset:{minHeight:40,paddingHorizontal:10,borderRadius:9,justifyContent:'center',alignItems:'center',flexDirection:'row',gap:6}, deleteAction:{minHeight:32,flexDirection:'row',alignItems:'center',gap:5}, add:{height:52,borderRadius:14,position:'absolute',bottom:40,left:16,right:16,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:9}, primaryText:{color:'#FFFFFF',fontWeight:'700'}, state:{alignItems:'center',padding:28}, stateTitle:{fontFamily:'Georgia',fontSize:23,textAlign:'center'}, stateCopy:{textAlign:'center',fontSize:14,lineHeight:20,marginTop:10}, stateAction:{marginTop:20,minHeight:48,borderRadius:12,paddingHorizontal:18,justifyContent:'center'}, notice:{position:'absolute',bottom:102,left:16,right:16,borderRadius:12,padding:14,flexDirection:'row',alignItems:'center',gap:12}, noticeText:{flex:1,fontSize:13,lineHeight:18}, noticeAction:{color:'#FFFFFF',fontWeight:'800'}, scrim:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,.42)'}, settingsScrim:{flex:1,justifyContent:'flex-end',paddingTop:48,backgroundColor:'rgba(0,0,0,.42)'}, settingsSheet:{maxHeight:'100%',flexShrink:1}, settingsScroll:{flexShrink:1}, settingsContent:{gap:8}, centerScrim:{flex:1,justifyContent:'center',padding:24,backgroundColor:'rgba(0,0,0,.42)'}, sheet:{padding:20,borderTopLeftRadius:28,borderTopRightRadius:28,gap:8}, confirmCard:{borderRadius:20,borderWidth:1,padding:20}, sheetTitle:{fontFamily:'Georgia',fontSize:25,marginBottom:12}, confirmTitle:{fontFamily:'Georgia',fontSize:23}, confirmBody:{fontSize:14,lineHeight:20,marginTop:10}, label:{fontSize:13,fontWeight:'700',marginTop:5}, input:{borderWidth:1,borderRadius:12,minHeight:50,paddingHorizontal:14,fontSize:16}, datePicker:{borderWidth:1,borderRadius:12,minHeight:56,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, dateValue:{fontSize:15}, dateChange:{fontSize:13,fontWeight:'700'}, hint:{fontSize:12,lineHeight:17}, backupWarning:{fontSize:12,lineHeight:17,fontWeight:'700',marginTop:8}, backupAction:{minHeight:50,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',marginTop:8}, actions:{flexDirection:'row',gap:10,marginTop:16}, primary:{flex:1,minHeight:50,borderRadius:12,alignItems:'center',justifyContent:'center'}, secondary:{flex:1,minHeight:50,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'}
+  app:{flex:1,paddingHorizontal:16,paddingTop:12}, iconButton:{width:48,height:48,borderWidth:1,borderRadius:14,alignItems:'center',justifyContent:'center'}, profileLabel:{fontSize:14,marginTop:5}, loading:{flex:1,alignItems:'center',justifyContent:'center',gap:12},loadingName:{fontFamily:'Georgia',fontSize:28},loadingCopy:{fontSize:14}, header:{paddingTop:18,flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'}, brand:{flex:1,flexDirection:'row',alignItems:'center',gap:10,paddingRight:12}, eyebrow:{fontSize:10,fontWeight:'700',letterSpacing:1.5}, title:{fontFamily:'Georgia',fontSize:27,lineHeight:31,marginTop:4}, theme:{minHeight:44,paddingHorizontal:12,borderWidth:1,borderRadius:10,justifyContent:'center'}, themeRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:8}, banner:{borderRadius:24,padding:20,marginTop:24,marginBottom:20,overflow:'hidden'}, bannerLeaf:{position:'absolute',right:18,bottom:18,opacity:.8}, bannerTitle:{fontFamily:'Georgia',fontSize:23,lineHeight:28}, bannerCopy:{fontSize:14,lineHeight:20,marginTop:12,maxWidth:280,opacity:.9}, section:{fontSize:16,fontWeight:'700',marginBottom:10}, list:{paddingBottom:86}, emptyList:{flexGrow:1,justifyContent:'center',paddingBottom:90}, card:{borderWidth:1,borderRadius:16,padding:14,marginBottom:10,flexDirection:'row',gap:12}, cardText:{flex:1,minHeight:94,justifyContent:'center'}, activityHeading:{flexDirection:'row',alignItems:'center',gap:8}, cardTitle:{flexShrink:1,fontSize:16,fontWeight:'700'}, editLink:{fontSize:12,fontWeight:'700'}, lastDone:{flexDirection:'row',alignItems:'center',gap:5,marginTop:6}, date:{fontSize:12}, cardSide:{width:154,alignItems:'flex-end',gap:8}, elapsedRow:{flexDirection:'row',alignItems:'center',gap:5}, elapsed:{fontWeight:'700'}, reset:{minHeight:40,paddingHorizontal:10,borderRadius:9,justifyContent:'center',alignItems:'center',flexDirection:'row',gap:6}, deleteAction:{minHeight:32,flexDirection:'row',alignItems:'center',gap:5}, add:{height:52,borderRadius:14,position:'absolute',bottom:40,left:16,right:16,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:9}, primaryText:{color:'#FFFFFF',fontWeight:'700'}, state:{alignItems:'center',padding:28}, stateTitle:{fontFamily:'Georgia',fontSize:23,textAlign:'center'}, stateCopy:{textAlign:'center',fontSize:14,lineHeight:20,marginTop:10}, stateAction:{marginTop:20,minHeight:48,borderRadius:12,paddingHorizontal:18,justifyContent:'center'}, notice:{position:'absolute',bottom:102,left:16,right:16,borderRadius:12,padding:14,flexDirection:'row',alignItems:'center',gap:12}, noticeText:{flex:1,fontSize:13,lineHeight:18}, noticeAction:{color:'#FFFFFF',fontWeight:'800'}, scrim:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,.42)'}, settingsScrim:{flex:1,justifyContent:'flex-end',paddingTop:48,backgroundColor:'rgba(0,0,0,.42)'}, settingsSheet:{maxHeight:'100%',flexShrink:1}, settingsScroll:{flexShrink:1}, settingsContent:{gap:8}, centerScrim:{flex:1,justifyContent:'center',padding:24,backgroundColor:'rgba(0,0,0,.42)'}, sheet:{padding:20,borderTopLeftRadius:28,borderTopRightRadius:28,gap:8}, confirmCard:{borderRadius:20,borderWidth:1,padding:20}, sheetTitle:{fontFamily:'Georgia',fontSize:25,marginBottom:12}, confirmTitle:{fontFamily:'Georgia',fontSize:23}, confirmBody:{fontSize:14,lineHeight:20,marginTop:10}, label:{fontSize:13,fontWeight:'700',marginTop:5}, input:{borderWidth:1,borderRadius:12,minHeight:50,paddingHorizontal:14,fontSize:16}, datePicker:{borderWidth:1,borderRadius:12,minHeight:56,paddingHorizontal:14,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, dateValue:{fontSize:15}, dateChange:{fontSize:13,fontWeight:'700'}, hint:{fontSize:12,lineHeight:17}, clearReminder:{alignSelf:'flex-start',minHeight:36,justifyContent:'center'}, backupWarning:{fontSize:12,lineHeight:17,fontWeight:'700',marginTop:8}, backupAction:{minHeight:50,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center',marginTop:8}, actions:{flexDirection:'row',gap:10,marginTop:16}, primary:{flex:1,minHeight:50,borderRadius:12,alignItems:'center',justifyContent:'center'}, secondary:{flex:1,minHeight:50,borderRadius:12,borderWidth:1,alignItems:'center',justifyContent:'center'}
 });

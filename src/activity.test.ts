@@ -44,6 +44,13 @@ test('rejects title longer than 80 characters', () => {
   assert.equal(validateActivityInput('x'.repeat(81), today, today).title, 'Judul kegiatan maksimal 80 karakter.');
 });
 
+test('rejects a reminder that is not in the future', () => {
+  assert.equal(
+    validateActivityInput('Telepon Ibu', today, today, '2026-10-03T09:00:00.000Z', new Date('2026-10-03T09:00:00.000Z')).reminderAt,
+    'Waktu pengingat harus setelah sekarang.'
+  );
+});
+
 test('sorts oldest activity first, then oldest update', () => {
   const sorted = sortActivitiesByElapsed(
     [

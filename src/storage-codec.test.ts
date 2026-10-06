@@ -19,6 +19,7 @@ test('decodes valid persisted activities', () => {
   );
 
   assert.equal(activities[0]?.title, 'Telepon Ibu');
+  assert.equal(activities[0]?.reminderAt, undefined);
 });
 
 test('rejects corrupt persisted activities', () => {
@@ -27,5 +28,9 @@ test('rejects corrupt persisted activities', () => {
 });
 
 test('encodes a versioned activity payload', () => {
-  assert.deepEqual(JSON.parse(encodeActivities([])), { version: 1, activities: [] });
+  const activity = {
+    id: 'call-mom', title: 'Telepon Ibu', lastDoneAt: '2026-09-01', createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-01T09:00:00.000Z',
+    reminderAt: '2026-10-05T09:00:00.000Z', notificationId: 'notice-1',
+  };
+  assert.deepEqual(JSON.parse(encodeActivities([activity])), { version: 1, activities: [activity] });
 });

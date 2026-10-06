@@ -14,7 +14,7 @@ Catat hal-hal yang penting bagimu, lalu lihat sudah berapa lama sejak terakhir k
 Aplikasi ini sengaja dibuat tenang. Ia hanya menyampaikan fakta, keputusannya tetap di tanganmu.
 
 - Tanpa streak, target, skor, atau rasa bersalah
-- Tanpa pengingat dan notifikasi
+- Pengingat hanya jika kamu memilihnya sendiri
 - Tanpa akun, sinkronisasi cloud, iklan, atau analitik
 - Semua data tersimpan di perangkat
 
@@ -30,7 +30,8 @@ Ambil APK terbaru dari [halaman Releases](https://github.com/zmy16/terakhir-kali
 - **Tandai hari ini.** Meminta konfirmasi, lalu menyediakan satu kali undo.
 - **Profil lokal.** Hanya berisi nama tampilan, dipakai untuk sapaan sesuai jam. Ini bukan akun login.
 - **Tema gelap dan terang** dari sheet pengaturan.
-- **Backup JSON.** Export lewat share sheet sistem. Import menggabungkan data dan tidak pernah menghapus data yang ada.
+- **Pengingat lembut opsional.** Satu notifikasi lokal sekali jalan, pada waktu yang dipilih untuk satu aktivitas. Tidak ada pengulangan otomatis; izin notifikasi diminta hanya saat pengingat disimpan.
+- **Backup JSON.** Export langsung ke folder Download di Android. Import menggabungkan data dan tidak pernah menghapus data yang ada.
 - **Kondisi loading, kosong, dan error penyimpanan**, lengkap dengan tombol coba lagi jika data tersimpan gagal dibaca.
 
 > [!NOTE]
@@ -43,8 +44,9 @@ Ambil APK terbaru dari [halaman Releases](https://github.com/zmy16/terakhir-kali
 | Framework | [Expo](https://expo.dev) SDK 57, React Native 0.86, React 19.2 |
 | Bahasa | TypeScript 6 (`strict`) |
 | Penyimpanan | `expo-sqlite` key-value store, dengan payload JSON yang berversi dan divalidasi |
-| Backup | `expo-file-system`, `expo-sharing`, `expo-document-picker` |
+| Backup | `expo-file-system`, `react-native-file-access`, `expo-document-picker` |
 | Input tanggal | `@react-native-community/datetimepicker` |
+| Pengingat lokal | `expo-notifications` |
 | Grafik | `react-native-svg` untuk logo dan ikon |
 | Tata letak | `react-native-safe-area-context` |
 | Unit test | Test runner bawaan Node (`node:test`) lewat `tsx` |
@@ -164,5 +166,5 @@ Unit test mencakup format durasi, validasi input, urutan aktivitas, format dan p
 
 | Platform | Status |
 | --- | --- |
-| Android | Sudah dibuild sebagai APK dan diuji di perangkat fisik |
+| Android | APK tersedia; pengingat dan export Download memerlukan build native, bukan Expo Go |
 | iOS | Sudah dikonfigurasi di `app.json`, tetapi belum dibuild atau diuji |

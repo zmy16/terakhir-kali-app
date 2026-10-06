@@ -4,9 +4,11 @@ export type Activity = {
   lastDoneAt: string;
   createdAt: string;
   updatedAt: string;
+  reminderAt?: string;
+  notificationId?: string;
 };
 
-export type ActivityInputErrors = Partial<Record<'title' | 'lastDoneAt', string>>;
+export type ActivityInputErrors = Partial<Record<'title' | 'lastDoneAt' | 'reminderAt', string>>;
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,8 +33,8 @@ function completeMonthsBetween(start: Date, end: Date): number {
   return Math.max(0, months);
 }
 
-export function validateActivityInput(title: string, lastDoneAt: string, today: string): ActivityInputErrors {
-  const errors: ActivityInputErrors = {};
+export function validateActivityInput(title: string, lastDoneAt: string, today: string, reminderAt?: string, now = new Date()): ActivityInputErrors {
+  const errors: ActivityInputErrors = {}; 
   const date = parseLocalDate(lastDoneAt);
   const currentDate = parseLocalDate(today);
 
@@ -40,6 +42,9 @@ export function validateActivityInput(title: string, lastDoneAt: string, today: 
   else if (title.trim().length > 80) errors.title = 'Judul kegiatan maksimal 80 karakter.';
   if (!date) errors.lastDoneAt = 'Tanggal tidak valid.';
   else if (currentDate && date > currentDate) errors.lastDoneAt = 'Tanggal tidak boleh melewati hari ini.';
+  if (reminderAt && (Number.isNaN(Date.parse(reminderAt)) || new Date(reminderAt) <= now)) {
+    errors.reminderAt = 'Waktu pengingat harus setelah sekarang.';
+  }
 
   return errors;
 }

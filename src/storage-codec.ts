@@ -26,7 +26,9 @@ function isActivity(value: unknown): value is Activity {
     && record.title.trim().length > 0
     && isCalendarDate(record.lastDoneAt)
     && isIsoTimestamp(record.createdAt)
-    && isIsoTimestamp(record.updatedAt);
+    && isIsoTimestamp(record.updatedAt)
+    && (record.reminderAt === undefined || isIsoTimestamp(record.reminderAt))
+    && (record.notificationId === undefined || typeof record.notificationId === 'string');
 }
 
 export function decodeActivities(raw: string): Activity[] {
